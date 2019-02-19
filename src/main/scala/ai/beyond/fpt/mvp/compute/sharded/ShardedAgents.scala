@@ -6,7 +6,7 @@ import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 
 object ShardedAgents {
   def props = Props(new ShardedAgents)
-  def name: String = "fintech-sharded-agents"
+  def name: String = "fpt-sharded-agents"
 }
 
 class ShardedAgents extends Actor with ActorLogging {
