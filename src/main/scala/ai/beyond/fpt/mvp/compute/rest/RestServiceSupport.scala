@@ -1,9 +1,9 @@
-package ai.beyond.paloul.fintech.rest
+package ai.beyond.fpt.mvp.compute.rest
 
+import ai.beyond.fpt.mvp.compute.Settings
 import akka.util.Timeout
 
 import scala.util.{Failure, Success}
-import ai.beyond.paloul.fintech.Settings
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
 import akka.stream.ActorMaterializer
 

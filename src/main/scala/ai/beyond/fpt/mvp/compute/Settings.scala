@@ -1,4 +1,4 @@
-package ai.beyond.paloul.fintech
+package ai.beyond.fpt.mvp.compute
 
 import scala.concurrent.duration._
 

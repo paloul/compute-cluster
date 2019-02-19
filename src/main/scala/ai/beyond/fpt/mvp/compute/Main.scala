@@ -1,7 +1,7 @@
-package ai.beyond.paloul.fintech
+package ai.beyond.fpt.mvp.compute
 
-import ai.beyond.paloul.fintech.rest.RestServiceSupport
-import ai.beyond.paloul.fintech.sharded.ShardedAgents
+import ai.beyond.fpt.mvp.compute.rest.RestServiceSupport
+import ai.beyond.fpt.mvp.compute.sharded.ShardedAgents
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 

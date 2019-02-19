@@ -1,21 +1,22 @@
-package ai.beyond.paloul.fintech.sharded
+package ai.beyond.fpt.mvp.compute.sharded
 
-import ai.beyond.paloul.fintech.agents.AlgorithmAgent
+import ai.beyond.fpt.mvp.compute.agents.ComputeAgent
 import akka.actor.{Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 
-// Companion object for ShardedAlgorithmAgent. Overall just
+// Companion object for ShardedComputeAgent. Overall just
 // a helper object to gain access to the underlying
 // ShardedMessages extractId and extractShard functions.
 // Along with giving algorithm agents a shard name.
-object ShardedAlgorithmAgent extends ShardedMessages {
-  def props = Props(new ShardedAlgorithmAgent)
+object ShardedComputeAgent extends ShardedMessages {
+  def props = Props(new ShardedComputeAgent)
   def name(agentId: Long): String = agentId.toString
 
-  val shardName: String = "algorithm-agents"
+  val shardName: String = "compute-agents"
 }
 
-class ShardedAlgorithmAgent extends AlgorithmAgent {
+
+class ShardedComputeAgent extends ComputeAgent {
 
   // Capture when an instance was created, val because it shouldn't change
   val objCreationTime = System.nanoTime()
@@ -34,10 +35,10 @@ class ShardedAlgorithmAgent extends AlgorithmAgent {
       // to the child, therefore putting a stop to all outgoing messages intended for the child
       // before sending it the official stop message.
       log.info("Received Timeout message, initiating Passivate for self [{}]", self.path.toString)
-      context.parent ! Passivate(stopMessage = AlgorithmAgent.Stop)
+      context.parent ! Passivate(stopMessage = ComputeAgent.Stop)
 
     // A Stop message was received so we stop ourselves
-    case AlgorithmAgent.Stop => context.stop(self)
+    case ComputeAgent.Stop => context.stop(self)
   }
 
 }

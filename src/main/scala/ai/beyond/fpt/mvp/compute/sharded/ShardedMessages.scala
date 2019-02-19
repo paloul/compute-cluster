@@ -1,4 +1,4 @@
-package ai.beyond.paloul.fintech.sharded
+package ai.beyond.fpt.mvp.compute.sharded
 
 import akka.cluster.sharding.ShardRegion
 
@@ -12,9 +12,9 @@ trait ShardedMessages {
   // The default basic Stop message, each Agent's companion object will define this
   // as a potential stop message for themselves. Cannot utilize this object directly, i.e.
   // as a ShardedMessages.Stop, once an Agent class's companion object extends ShardedMessages
-  // they will have access to the Stop message, i.e. StockPriceAgent.Stop.
+  // they will have access to the Stop message, i.e. ComputeAgent.Stop.
   // To see how this Stop message is used, check out the override unhandled(msg: Any) function
-  // in each Sharded Agent class, i.e. ShardedStockPriceAgent.
+  // in each Sharded Agent class, i.e. ShardedComputeAgent.
   case object Stop
 
   // Ths base SharedMessage Trait. This is a trait that all other base Agent Messages

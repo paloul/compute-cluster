@@ -1,12 +1,12 @@
-package ai.beyond.paloul.fintech.serializers
+package ai.beyond.fpt.mvp.compute.serializers
 
 import akka.serialization.SerializerWithStringManifest
 import org.json4s._
 import org.json4s.native.Serialization
 import org.json4s.native.Serialization.{read, write}
 
-class WorkAgentSerializer extends SerializerWithStringManifest {
-  def identifier:Int = 9994
+class ComputeAgentSerializer extends SerializerWithStringManifest {
+  def identifier:Int = 9991
 
   implicit val formats = Serialization.formats(NoTypeHints)
 

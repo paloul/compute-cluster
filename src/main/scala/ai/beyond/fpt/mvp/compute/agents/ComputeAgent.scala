@@ -1,6 +1,6 @@
-package ai.beyond.paloul.fintech.agents
+package ai.beyond.fpt.mvp.compute.agents
 
-import ai.beyond.paloul.fintech.sharded.ShardedMessages
+import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
 import akka.actor.{Actor, ActorLogging, Props}
 
 // The companion object that extends the base ShardedMessages trait
@@ -9,8 +9,8 @@ import akka.actor.{Actor, ActorLogging, Props}
 // 3) the trait ShardMessage is mixed in so that we can create the
 // general Message type for this specific agent type and used in
 // routing from managers to shardregions to unique intended entity agents
-object AlgorithmAgent extends ShardedMessages {
-  def props(agentId: String) = Props(new AlgorithmAgent)
+object ComputeAgent extends ShardedMessages {
+  def props(agentId: String) = Props(new ComputeAgent)
 
   // Create the catch Message type for this agent
   // This will allows us to determine which shard manager
@@ -23,9 +23,9 @@ object AlgorithmAgent extends ShardedMessages {
   case class HelloThere(agentId: String, msgBody: String) extends Message
 }
 
-class AlgorithmAgent extends Actor with ActorLogging {
+class ComputeAgent extends Actor with ActorLogging {
   // Import the companion object above to use the messages defined for us
-  import AlgorithmAgent._
+  import ComputeAgent._
 
   // self.path.name is the entity identifier (utf-8 URL-encoded)
   def id: String = self.path.name
@@ -35,18 +35,18 @@ class AlgorithmAgent extends Actor with ActorLogging {
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    log.info("Algorithm Agent - {} - starting", id)
+    log.info("Compute Agent - {} - starting", id)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // Debugging information if agent is restarted
-    log.error(reason, "Algorithm Agent restarting due to [{}] when processing [{}]",
+    log.error(reason, "Compute Agent restarting due to [{}] when processing [{}]",
       reason.getMessage, message.getOrElse(""))
     super.preRestart(reason, message)
   }
 
   override def postStop(): Unit = {
-    log.info("Algorithm Agent - {} - stopped", id)
+    log.info("Compute Agent - {} - stopped", id)
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
