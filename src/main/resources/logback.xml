@@ -11,6 +11,7 @@
 
     <!-- log everything to a rolling file -->
     <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--TODO: have the rolling file location be a config param defined in application.conf-->
         <file>logs/current.log</file>
         <append>true</append>
         <!-- set immediateFlush to false for much higher logging throughput -->
@@ -22,6 +23,7 @@
 
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- daily rollover -->
+            <!--TODO: have the rolling file location be a config param defined in application.conf-->
             <fileNamePattern>logs/%d{yyyy-MM-dd}.log</fileNamePattern>
             <!-- keep 60 days' worth of history -->
             <maxHistory>60</maxHistory>
@@ -44,7 +46,7 @@
     <!-- Turn down Kafka noise -->
     <logger name="org.apache.kafka" level="WARN" />
 
-    <root level="DEBUG" additivity="TRUE">
+    <root name="root" level="DEBUG" additivity="TRUE">
         <appender-ref ref="ROLLING_FILE" />
         <appender-ref ref="STDOUT" />
     </root>
