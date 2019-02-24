@@ -1,21 +1,53 @@
 <configuration>
+    <!--https://logback.qos.ch/manual/appenders.html-->
+
+    <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
+    <!-- Regular Console STD OUT Appender. Will obviously output to console terminal -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <!--<appender name="FILE" class="ch.qos.logback.core.FileAppender">-->
-        <!--&lt;!&ndash; path to your log file, where you want to store logs &ndash;&gt;-->
-        <!--<file>/Users/yourusername/test.log</file>-->
-        <!--<append>false</append>-->
-        <!--<encoder>-->
-            <!--<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>-->
-        <!--</encoder>-->
-    <!--</appender>-->
+    <!-- log everything to a rolling file -->
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/current.log</file>
+        <append>true</append>
+        <!-- set immediateFlush to false for much higher logging throughput -->
+        <immediateFlush>true</immediateFlush>
 
-    <root level="info">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>logs/%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- keep 60 days' worth of history -->
+            <maxHistory>60</maxHistory>
+            <!--capped at 3GB total size-->
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
+
+
+
+    <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
+    <!-- Cassandra and the datastax driver are used by the Lagom event sourcing modules -->
+    <logger name="org.apache.cassandra" level="ERROR" />
+    <logger name="com.datastax.driver" level="ERROR" />
+
+    <!-- Turning off connection error logging to avoid noise when services are forcibly stopped -->
+    <logger name="com.datastax.driver.core.ControlConnection" level="OFF" />
+
+    <!-- Turn down Kafka noise -->
+    <logger name="org.apache.kafka" level="WARN" />
+
+    <root level="DEBUG" additivity="TRUE">
+        <appender-ref ref="ROLLING_FILE" />
         <appender-ref ref="STDOUT" />
-        <!--<appender-ref ref="FILE" />-->
     </root>
+    <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
+
 </configuration>

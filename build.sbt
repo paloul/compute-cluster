@@ -4,6 +4,8 @@ version := "0.6.0"
 
 scalaVersion := "2.12.8"
 
+exportJars := true
+
 libraryDependencies ++= {
   val json4sVersion = "3.6.4"
   val akkaVersion = "2.5.20"
@@ -14,6 +16,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0-RC2",
 
     "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
 

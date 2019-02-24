@@ -1,14 +1,15 @@
 package ai.beyond.fpt.mvp.compute.agents
 
+import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
 import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, Props}
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
 // functions can apply, 2) the basic Stop message is inherited,
 // 3) the trait ShardMessage is mixed in so that we can create the
 // general Message type for this specific agent type and used in
-// routing from managers to shardregions to unique intended entity agents
+// routing from managers to ShardRegions to unique intended entity agents
 object ComputeAgent extends ShardedMessages {
   def props(agentId: String) = Props(new ComputeAgent)
 
@@ -23,7 +24,7 @@ object ComputeAgent extends ShardedMessages {
   case class HelloThere(agentId: String, msgBody: String) extends Message
 }
 
-class ComputeAgent extends Actor with ActorLogging {
+class ComputeAgent extends Actor with ComputeAgentLogging {
   // Import the companion object above to use the messages defined for us
   import ComputeAgent._
 
