@@ -1,8 +1,10 @@
 package ai.beyond.fpt.mvp.compute.agents
 
+import ai.beyond.fpt.mvp.compute.Settings
 import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
 import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
 import akka.actor.{Actor, Props}
+import org.apache.kafka.clients.producer.KafkaProducer
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
@@ -12,6 +14,10 @@ import akka.actor.{Actor, Props}
 // routing from managers to ShardRegions to unique intended entity agents
 object ComputeAgent extends ShardedMessages {
   def props(agentId: String) = Props(new ComputeAgent)
+
+  // Create a kafka producer for the compute agents.
+  val kafkaProducerSettings = Settings.settings.get.kafka.producerSettings
+  val kafkaProducer = kafkaProducerSettings.createKafkaProducer()
 
   // Create the catch Message type for this agent
   // This will allows us to determine which shard manager

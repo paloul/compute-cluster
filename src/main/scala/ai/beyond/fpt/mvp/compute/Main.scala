@@ -9,7 +9,7 @@ object Main extends App with RestServiceSupport {
 
   // Load the application.conf file and create our own Settings helper class
   val config = ConfigFactory.load()
-  val settings: Settings = new Settings(config)
+  val settings: Settings = Settings(config)
 
   // Seed node names in application.conf should match the label used here for ActorSystem
   // i.e "akka.tcp://"${application.cluster.name}"@127.0.0.1:2551"
