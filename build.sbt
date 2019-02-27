@@ -16,7 +16,6 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0-RC2",
 
     "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
 
@@ -35,7 +34,8 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.2.3",
 
     "org.json4s" %% "json4s-native" % json4sVersion,
-    "org.json4s" %% "json4s-ext" % json4sVersion
+    "org.json4s" %% "json4s-ext" % json4sVersion,
+
+    "org.apache.kafka" % "kafka-clients" % "2.1.1"
   )
-    //.map(_.exclude("io.dropwizard.metrics", "metrics-core")) // if you want to exclude any sub libraries
 }
