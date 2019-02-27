@@ -1,10 +1,11 @@
 package ai.beyond.fpt.mvp.compute.agents
 
-import ai.beyond.fpt.mvp.compute.Settings
 import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
 import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
-import akka.actor.{Actor, Props}
-import org.apache.kafka.clients.producer.KafkaProducer
+import akka.actor.{Actor, Cancellable, Props}
+
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
@@ -15,10 +16,6 @@ import org.apache.kafka.clients.producer.KafkaProducer
 object ComputeAgent extends ShardedMessages {
   def props(agentId: String) = Props(new ComputeAgent)
 
-  // Create a kafka producer for the compute agents.
-  val kafkaProducerSettings = Settings.settings.get.kafka.producerSettings
-  val kafkaProducer = kafkaProducerSettings.createKafkaProducer()
-
   // Create the catch Message type for this agent
   // This will allows us to determine which shard manager
   // to forward messages to. Refer to the ShardedAgents.receive
@@ -26,8 +23,10 @@ object ComputeAgent extends ShardedMessages {
   trait Message extends ShardedMessage
 
   // Messages specific to the StockPriceAgent
+  case class CancelJob(agentId: String) extends Message
   case class PrintPath(agentId: String) extends Message
   case class HelloThere(agentId: String, msgBody: String) extends Message
+  case class InitiateCompute(agentId: String, topic: String, partition: Int, socketeer: String)
 }
 
 class ComputeAgent extends Actor with ComputeAgentLogging {
@@ -36,6 +35,8 @@ class ComputeAgent extends Actor with ComputeAgentLogging {
 
   // self.path.name is the entity identifier (utf-8 URL-encoded)
   def id: String = self.path.name
+
+  var computeJob: Cancellable = null
 
 
   //------------------------------------------------------------------------//
@@ -60,13 +61,53 @@ class ComputeAgent extends Actor with ComputeAgentLogging {
   //------------------------------------------------------------------------//
 
 
+  //------------------------------------------------------------------------//
+  // Begin Actor Receive Behavior
+  //------------------------------------------------------------------------//
   override def receive: Receive = {
     case PrintPath(agentId) =>
       log.info("I've been told to print my path: {}", agentId)
+      context.actorSelection("/user/" + KafkaProducerAgent.name) ! KafkaProducerAgent.Message("hello", 0, "Compute", "PrintPath!")
 
     case HelloThere(agentId, msgBody) =>
       log.info("({}) Hello there, you said, '{}'", agentId, msgBody)
+      runCompute("hello", 0, "wassup")
+
+    case InitiateCompute(agentId, topic, partition, socketeer) =>
+      log.info("Initiating compute job with ID:{}", agentId)
+      runCompute(topic, partition, socketeer)
+
+    case CancelJob(agentId) =>
+      log.info("Cancelling the Compute Job {}", agentId)
+      computeJob.cancel()
+  }
+  //------------------------------------------------------------------------//
+  // End Actor Receive Behavior
+  //------------------------------------------------------------------------//
+
+
+  //------------------------------------------------------------------------//
+  // Begin Compute Functions
+  //------------------------------------------------------------------------//
+  def runCompute(topic: String , partition: Int, socketeer: String): Unit = {
+
+    val kafkaProducerAgentRef = context.actorSelection("/user/" + KafkaProducerAgent.name)
+
+    var messageCount = 0
+    computeJob = context.system.scheduler.schedule(500 milliseconds, 2000 milliseconds) {
+
+      // TODO: Create the JSON message here and convert to string for msg
+      val msg = "awesomeness"
+      kafkaProducerAgentRef ! KafkaProducerAgent.Message(topic, partition, id, msg)
+
+      messageCount += 1
+      if (messageCount > 10) self ! CancelJob(id)
+
+    }
 
   }
+  //------------------------------------------------------------------------//
+  // End Compute Functions
+  //------------------------------------------------------------------------//
 
 }

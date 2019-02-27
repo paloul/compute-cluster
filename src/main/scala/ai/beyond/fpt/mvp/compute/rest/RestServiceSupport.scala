@@ -65,7 +65,11 @@ trait RestServiceSupport extends RequestTimeout {
     // Unbind from the port and shut down when down
     bindingFuture
       .flatMap(_.unbind())
-      .onComplete(_ => CoordinatedShutdown(system).run(new ShutdownRequested with CoordinatedShutdown.Reason))
+      .onComplete(_ => {
+          CoordinatedShutdown(system).run(new ShutdownRequested with CoordinatedShutdown.Reason)
+        }
+      )
+
   }
 }
 

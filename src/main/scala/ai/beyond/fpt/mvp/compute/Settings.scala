@@ -1,26 +1,19 @@
 package ai.beyond.fpt.mvp.compute
 
+import java.util.Properties
+
 import scala.concurrent.duration._
 import akka.actor._
-import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
-import org.apache.kafka.common.serialization.StringSerializer
 
 // This companion object here should not be touched, its basic infrastructure support
 // to help create a connection between our application.conf file, Settings class
 // and the Actor System.
 object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
 
-  // Formatted to support instantiation only once and then refer back
-  // to instantiation when needed again. The apply method is a scala
-  // way of working with companion object and instantiation of classes
-  var settings: Option[Settings] = None
-  def apply(config: Config): Settings = {
-    if (!settings.isDefined)
-      settings = Some(new Settings(config))
-
-    settings.get
-  }
+  // The apply method is a scala way of working with
+  // companion object and instantiation of classes
+  def apply(config: Config): Settings = new Settings(config)
 
   // The lookup method is required by ExtensionIdProvider,
   // so we return ourselves here, this allows us
@@ -52,8 +45,21 @@ class Settings(config: Config) extends Extension {
   }
 
   object kafka {
-    val kafkaConfig = config.getConfig("akka.kafka.producer")
-    val producerSettings = ProducerSettings(config, new StringSerializer, new StringSerializer)
+    val bootstrapServers: String = config.getString("application.kafka.bootstrap.servers")
+    val lingerMilliSeconds: String = config.getString("application.kafka.linger.ms")
+    val acks: String = config.getString("application.kafka.acks")
+    val bufferMemory: String = config.getString("application.kafka.buffer.memory")
+    val maxBlockMilliSeconds: String = config.getString("application.kafka.max.block.ms")
+
+    val props = new Properties()
+    props.put("acks", acks)
+    props.put("buffer.memory", bufferMemory)
+    props.put("linger.ms", lingerMilliSeconds)
+    props.put("bootstrap.servers", bootstrapServers)
+    props.put("max.block.ms", maxBlockMilliSeconds)
+    props.put("client.id", "ai.beyond.fpt.mvp")
+    props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+    props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   }
 
   // ******************************************************************************

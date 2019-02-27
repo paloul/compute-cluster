@@ -56,7 +56,7 @@ class KafkaProducerAgent extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case Message(topic, partition, key, message) =>
-      log.info("KafkaProducer Agent - {} - Received message to produce message over Kafka")
+      log.info("KafkaProducer Agent - {} - Received message to produce message over Kafka", id)
       produce(topic, partition, key, message)
   }
 

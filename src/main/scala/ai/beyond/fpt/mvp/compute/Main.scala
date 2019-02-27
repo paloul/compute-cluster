@@ -1,5 +1,6 @@
 package ai.beyond.fpt.mvp.compute
 
+import ai.beyond.fpt.mvp.compute.agents.KafkaProducerAgent
 import ai.beyond.fpt.mvp.compute.rest.RestServiceSupport
 import ai.beyond.fpt.mvp.compute.sharded.ShardedAgents
 import akka.actor.ActorSystem
@@ -15,6 +16,19 @@ object Main extends App with RestServiceSupport {
   // i.e "akka.tcp://"${application.cluster.name}"@127.0.0.1:2551"
   // Look in application.conf for the list defined by {akka.cluster.seed-nodes}
   implicit val system: ActorSystem = ActorSystem(settings.cluster.name, config)
+
+  // Start the KafkaProducer Agent for this actor system. Each Actor System
+  // will have one KafkaProducer that handles all interaction over Kafka.
+  // All agents contained within an actor system will send akka messages
+  // to the KafkaProducer Agent which in turn will broadcast over Kafka.
+  // KafkaProducer Agent is local to the Actor System. Each Actor System
+  // will have one that serves actors in it.
+  // TODO: Load distribution and Resiliency of Kafka Producer
+  //  Look into creating a monitor/control KafkaAgent parent that supervises,
+  //  manages and distributes work to a pool of KafkaProducerAgents. This will
+  //  allow for the capability to alter the Supervision and restart any Producer
+  //  agent that crash due to underlying kafka library or whatever reason
+  system.actorOf(KafkaProducerAgent.props(settings), KafkaProducerAgent.name)
 
   // Get the main actor type to be used for sharded cluster of actors
   // ShardedAgents deals with identifying incoming requests and routing them
