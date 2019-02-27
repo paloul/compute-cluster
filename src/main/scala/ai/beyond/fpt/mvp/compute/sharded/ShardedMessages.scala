@@ -25,14 +25,14 @@ trait ShardedMessages {
   // extractShardId. The extractEntityId and extractShardId are two application specific
   // functions to extract the entity identifier and the shard identifier from incoming messages.
   trait ShardedMessage {
-    //def agentId: Long // ID as a Long, more restrictive ids
-    def agentId: String // ID as a string, more flexible ids
+    //def id: Long // ID as a Long, more restrictive ids
+    def id: String // ID as a string, more flexible ids
   }
 
   // Extract the parts from the message, id and msg, separately, and return
   // it as a tuple. This will help identify the intended agent entity
   val extractEntityId: ShardRegion.ExtractEntityId = {
-    case msg: ShardedMessage => (msg.agentId.toString, msg)
+    case msg: ShardedMessage => (msg.id.toString, msg)
   }
 
   // A shard is a group of actor entities that will be managed together. The grouping is defined
@@ -48,7 +48,7 @@ trait ShardedMessages {
   // for each shard. The sharding algorithm must be the same on all nodes in a running cluster.
   val extractShardId: ShardRegion.ExtractShardId = {
     //case msg: ShardedMessage => (msg.agentId % 7).toString // Requires the Long type version of ID
-    case msg: ShardedMessage => (msg.agentId.hashCode % 7).toString // Requires the String type version of ID
+    case msg: ShardedMessage => (msg.id.hashCode % 7).toString // Requires the String type version of ID
 
     // ShardRegion.StartEntity is used when remembering entities feature is turned on,
     // by default remembering entities is off, but this is here for future compatibility

@@ -4,8 +4,10 @@ import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
 import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
 import akka.actor.{Actor, Cancellable, Props}
 
+import spray.json._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
@@ -23,27 +25,45 @@ object ComputeAgent extends ShardedMessages {
   trait Message extends ShardedMessage
 
   // Messages specific to the StockPriceAgent
-  case class CancelJob(agentId: String) extends Message
-  case class PrintPath(agentId: String) extends Message
-  case class HelloThere(agentId: String, msgBody: String) extends Message
-  case class InitiateCompute(agentId: String, topic: String, partition: Int, socketeer: String)
+  case class CancelJob(id: String) extends Message
+  case class PrintPath(id: String) extends Message
+  case class HelloThere(id: String, msgBody: String) extends Message
+  case class InitiateCompute(id: String, partition: Int, socketeer: String) extends Message
+
+  ///////////////////////
+  // Private Read-Only Parameters
+  private val TOPIC_JOBSTATUS: String = "job_status"
+  ///////////////////////
 }
 
-class ComputeAgent extends Actor with ComputeAgentLogging {
+// Collect json format instances into a support trait
+// Helps marshall the messages between JSON received via HTTP APIs
+trait ComputeAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
+  implicit val itemFormat = jsonFormat3(ComputeAgent.InitiateCompute)
+}
+
+class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonSupport {
+  // Import all available functions under the context handle, i.e. become, actorSelection, system
+  import context._
   // Import the companion object above to use the messages defined for us
   import ComputeAgent._
 
   // self.path.name is the entity identifier (utf-8 URL-encoded)
-  def id: String = self.path.name
+  def agentId: String = self.path.name
 
+  /////////////////////////////////////////////////////////////////////////
+  // FIXME: GKP - 2019-02-27
+  // Temporary Cancellable future connected to the underlying compute job mimic block
+  // See below - in the runCompute function
   var computeJob: Cancellable = null
+  /////////////////////////////////////////////////////////////////////////
 
 
   //------------------------------------------------------------------------//
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    log.info("Compute Agent - {} - starting", id)
+    log.info("Compute Agent - {} - starting", agentId)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -54,7 +74,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging {
   }
 
   override def postStop(): Unit = {
-    log.info("Compute Agent - {} - stopped", id)
+    log.info("Compute Agent - {} - stopped", agentId)
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
@@ -64,22 +84,30 @@ class ComputeAgent extends Actor with ComputeAgentLogging {
   //------------------------------------------------------------------------//
   // Begin Actor Receive Behavior
   //------------------------------------------------------------------------//
-  override def receive: Receive = {
-    case PrintPath(agentId) =>
-      log.info("I've been told to print my path: {}", agentId)
-      context.actorSelection("/user/" + KafkaProducerAgent.name) ! KafkaProducerAgent.Message("hello", 0, "Compute", "PrintPath!")
+  override def receive: Receive = idle // Set the initial behavior to idle
 
-    case HelloThere(agentId, msgBody) =>
-      log.info("({}) Hello there, you said, '{}'", agentId, msgBody)
-      runCompute("hello", 0, "wassup")
+  // Idle behavior state
+  def idle: Receive = {
+    case PrintPath(id) =>
+      log.info("I've been told to print my path: {}", id)
 
-    case InitiateCompute(agentId, topic, partition, socketeer) =>
-      log.info("Initiating compute job with ID:{}", agentId)
-      runCompute(topic, partition, socketeer)
+    case HelloThere(id, msgBody) =>
+      log.info("({}) Hello there, you said, '{}'", id, msgBody)
 
-    case CancelJob(agentId) =>
-      log.info("Cancelling the Compute Job {}", agentId)
+    case InitiateCompute(id, partition, socketeer) =>
+      log.info("Initiating compute job with ID:{}", id)
+      runCompute(id, partition, socketeer)
+
+      become(computing)
+  }
+
+  // Compute behavior state
+  def computing: Receive = {
+    case CancelJob(id) =>
+      log.info("Cancelling the Compute Job {}", id)
       computeJob.cancel()
+
+      become(idle)
   }
   //------------------------------------------------------------------------//
   // End Actor Receive Behavior
@@ -89,21 +117,32 @@ class ComputeAgent extends Actor with ComputeAgentLogging {
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
-  def runCompute(topic: String , partition: Int, socketeer: String): Unit = {
+  def runCompute(id: String, partition: Int, socketeer: String): Unit = {
 
-    val kafkaProducerAgentRef = context.actorSelection("/user/" + KafkaProducerAgent.name)
+    val kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
 
-    var messageCount = 0
-    computeJob = context.system.scheduler.schedule(500 milliseconds, 2000 milliseconds) {
+    /////////////////////////////////////////////////////////////////////////
+    // FIXME: GKP - 2019-02-27
+    //  This block just mimics potential compute being done
+    //  It sets up a scheduler that sends out status messages over kafka using the KafkaProducer Agent
+    //  After 60 messages sent it will send itself a CancelJob message which will cancel the Scheduler
+    var messageCount: Int = 0
+    def roundUp(f: Float) = math.ceil(f).toInt
+    computeJob = system.scheduler.schedule(500 milliseconds, 1500 milliseconds) {
 
-      // TODO: Create the JSON message here and convert to string for msg
-      val msg = "awesomeness"
-      kafkaProducerAgentRef ! KafkaProducerAgent.Message(topic, partition, id, msg)
+      messageCount = messageCount + 1
+      val percentComplete: Int = roundUp((messageCount / 60f) * 100);
+      log.info("The Percentage Job [{}] Complete - {}", id, percentComplete)
 
-      messageCount += 1
-      if (messageCount > 10) self ! CancelJob(id)
+      // Temporary for testing purposes, calculate percent complete and embed into json to be sent back
+      val baseJson = InitiateCompute(id, partition, socketeer).toJson.asJsObject
+      val newJson = JsObject(baseJson.fields + ("percent_done" -> JsNumber(percentComplete)))
 
+      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, newJson.toString())
+
+      if (messageCount == 60) self ! CancelJob(id)
     }
+    /////////////////////////////////////////////////////////////////////////
 
   }
   //------------------------------------------------------------------------//
