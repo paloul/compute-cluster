@@ -125,22 +125,25 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     // FIXME: GKP - 2019-02-27
     //  This block just mimics potential compute being done
     //  It sets up a scheduler that sends out status messages over kafka using the KafkaProducer Agent
-    //  After 60 messages sent it will send itself a CancelJob message which will cancel the Scheduler
+    //  After 30-80 messages sent it will send itself a CancelJob message which will cancel the Scheduler
     var messageCount: Int = 0
     def roundUp(f: Float) = math.ceil(f).toInt
-    computeJob = system.scheduler.schedule(500 milliseconds, 1500 milliseconds) {
+    val totalMessages:Float = 30 + (new scala.util.Random).nextInt((80 - 30) + 1) // random num between 30 and 80
+    computeJob = system.scheduler.schedule(500 milliseconds, 1000 milliseconds) {
 
       messageCount = messageCount + 1
-      val percentComplete: Int = roundUp((messageCount / 60f) * 100);
-      log.info("The Percentage Job [{}] Complete - {}", id, percentComplete)
+      val percentComplete: Int = roundUp((messageCount / totalMessages) * 100)
+      log.info("Job [{}] Complete - {}%", id, percentComplete)
 
-      // Temporary for testing purposes, calculate percent complete and embed into json to be sent back
-      val baseJson = InitiateCompute(id, partition, socketeer).toJson.asJsObject
-      val newJson = JsObject(baseJson.fields + ("percent_done" -> JsNumber(percentComplete)))
+      // Create new json to send over kafka
+      val json = JsObject(
+        "id" -> JsString(id),
+        "socketeer" -> JsString(socketeer),
+        "percent_done" -> JsNumber(percentComplete))
 
-      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, newJson.toString())
+      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, json.toString())
 
-      if (messageCount == 60) self ! CancelJob(id)
+      if (messageCount == totalMessages) self ! CancelJob(id)
     }
     /////////////////////////////////////////////////////////////////////////
 
