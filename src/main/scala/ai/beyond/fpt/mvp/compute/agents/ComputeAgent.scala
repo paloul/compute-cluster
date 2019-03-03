@@ -101,7 +101,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
       sender ! "Idle"
 
     case PrintPath(id) =>
-      log.info("My, [{}], path is {}", agentPath)
+      log.info("My, [{}], path is {}", id, agentPath)
 
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)

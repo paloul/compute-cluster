@@ -39,6 +39,9 @@ class ShardedComputeAgent extends ComputeAgent {
 
     // A Stop message was received so we stop ourselves
     case ComputeAgent.Stop => context.stop(self)
+
+    // Catch the unhandled message, as Scala Match throws an error scala.MatchError, if we don't catch them
+    case _ => log.warning("Received unknown message that was unhandled, ignoring")
   }
 
 }

@@ -3,13 +3,15 @@ package ai.beyond.fpt.mvp.compute.rest
 import ai.beyond.fpt.mvp.compute.agents.{ComputeAgent, ComputeAgentJsonSupport}
 import akka.actor.{ActorRef, ActorSystem}
 import akka.util.Timeout
+import akka.pattern.ask
 
 import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server.Directives._
+import spray.json.{JsObject, JsString}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 // RestService defines all the routes and handlers for each request.
 // This class is where you would add additional functionality concerning
@@ -21,7 +23,7 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
   // All route subroutines below should be added to this definition.
   // This routes definition is publicly available to the outside
   def routes: server.Route =
-    computeAgentPrintPath ~ computeAgentHello ~ computeJobInitiate
+    computeAgentPrintPath ~ computeAgentHello ~ computeJobInitiate ~ computeJobState ~ computeJobCancel
 
   //------------------------------------------------------------------------//
   // Begin API Routes
@@ -61,6 +63,34 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
             agents ! ComputeAgent.InitiateCompute(initiate.id, initiate.partition, initiate.socketeer)
             complete(OK)
           }
+        }
+      }
+    }
+  }
+
+  // API handler for /v1/api/compute/job/{id}/cancel
+  private def computeJobCancel = {
+    get {
+      pathPrefix("v1" / "api" / "compute" / "job" / UniqueIdString / "cancel" ) { id =>
+        pathEndOrSingleSlash {
+          agents ! ComputeAgent.CancelJob(id)
+          complete(OK)
+        }
+      }
+    }
+  }
+
+  // API handler for /v1/api/compute/job/{id}/state
+  private def computeJobState = {
+    get {
+      pathPrefix("v1" / "api" / "compute" / "job" / UniqueIdString / "state" ) { id =>
+        pathEndOrSingleSlash {
+          val future = agents ? ComputeAgent.GetState(id)
+          val state = Await.result(future, timeout.duration).asInstanceOf[String]
+
+          complete(JsObject(
+            "id" -> JsString(id),
+            "state" -> JsString(state)))
         }
       }
     }
