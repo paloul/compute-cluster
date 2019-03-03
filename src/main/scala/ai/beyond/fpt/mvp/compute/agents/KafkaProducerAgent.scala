@@ -56,7 +56,7 @@ class KafkaProducerAgent extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case Message(topic, partition, key, message) =>
-      log.info("KafkaProducer Agent - {} - Received message to produce message over Kafka", id)
+      log.debug("KafkaProducer Agent - {} - Received message to produce message over Kafka", id)
       produce(topic, partition, key, message)
   }
 
@@ -64,14 +64,15 @@ class KafkaProducerAgent extends Actor with ActorLogging {
 
     val data = new ProducerRecord[String,String](topic, partition, msgKey, msg)
 
-    if (kafkaProducer.isDefined)
-      kafkaProducer.get.send(data, produceCallback)
+    // Send the message async
+    if (kafkaProducer.isDefined) kafkaProducer.get.send(data, produceCallback)
   }
 
   private val produceCallback = new Callback {
 
+    // TODO: Build out this onCompletion method and check for potential exception in body
     override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-      log.info("published: " + metadata.toString)
+      log.debug("published: " + metadata.toString)
     }
 
   }

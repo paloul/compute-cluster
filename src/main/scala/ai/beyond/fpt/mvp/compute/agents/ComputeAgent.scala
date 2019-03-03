@@ -3,10 +3,12 @@ package ai.beyond.fpt.mvp.compute.agents
 import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
 import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
 import akka.actor.{Actor, Cancellable, Props}
-
 import spray.json._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.util.Timeout
+import akka.pattern.ask
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 // The companion object that extends the base ShardedMessages trait
@@ -24,8 +26,10 @@ object ComputeAgent extends ShardedMessages {
   // function to see how its used, AlgorithmAgent.Message
   trait Message extends ShardedMessage
 
-  // Messages specific to the StockPriceAgent
+  // Messages specific to the Compute Agent
+  case class GetState(id: String) extends Message
   case class CancelJob(id: String) extends Message
+  case class CompleteJob(id: String) extends Message
   case class PrintPath(id: String) extends Message
   case class HelloThere(id: String, msgBody: String) extends Message
   case class InitiateCompute(id: String, partition: Int, socketeer: String) extends Message
@@ -33,6 +37,9 @@ object ComputeAgent extends ShardedMessages {
   ///////////////////////
   // Private Read-Only Parameters
   private val TOPIC_JOBSTATUS: String = "job_status"
+
+  // Default timeout for Ask patterns to other agents (even self)
+  private implicit val TIMEOUT = Timeout(5 seconds)
   ///////////////////////
 }
 
@@ -49,7 +56,8 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   import ComputeAgent._
 
   // self.path.name is the entity identifier (utf-8 URL-encoded)
-  def agentId: String = self.path.name
+  def agentPath: String = self.path.toStringWithoutAddress
+  def agentName: String = self.path.name
 
   /////////////////////////////////////////////////////////////////////////
   // FIXME: GKP - 2019-02-27
@@ -63,7 +71,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    log.info("Compute Agent - {} - starting", agentId)
+    log.info("Compute Agent - {} - starting", agentPath)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -74,7 +82,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   }
 
   override def postStop(): Unit = {
-    log.info("Compute Agent - {} - stopped", agentId)
+    log.info("Compute Agent - {} - stopped", agentPath)
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
@@ -88,14 +96,18 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
   // Idle behavior state
   def idle: Receive = {
+    case GetState(id) =>
+      log.info("I, [{}], am in an Idle state of mind", id)
+      sender ! "Idle"
+
     case PrintPath(id) =>
-      log.info("I've been told to print my path: {}", id)
+      log.info("My, [{}], path is {}", agentPath)
 
     case HelloThere(id, msgBody) =>
-      log.info("({}) Hello there, you said, '{}'", id, msgBody)
+      log.info("Hello there, [{}], you said, '{}'", id, msgBody)
 
     case InitiateCompute(id, partition, socketeer) =>
-      log.info("Initiating compute job with ID:{}", id)
+      log.info("Initiating compute job with ID[{}]", id)
       runCompute(id, partition, socketeer)
 
       become(computing)
@@ -103,11 +115,33 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
   // Compute behavior state
   def computing: Receive = {
-    case CancelJob(id) =>
-      log.info("Cancelling the Compute Job {}", id)
+    case GetState(id) =>
+      log.info("I, [{}], have been computing tirelessly", id)
+      sender ! "Running"
+
+    case CompleteJob(id) =>
+      log.info("Finalizing the Compute Job [{}] and marking completion", id)
       computeJob.cancel()
 
-      become(idle)
+      become(completed)
+
+    case CancelJob(id) =>
+      log.info("Cancelling the Compute Job [{}]", id)
+      computeJob.cancel()
+
+      become(cancelled)
+  }
+
+  def cancelled: Receive = {
+    case GetState(id) =>
+      log.info("I, [{}], have been cancelled", id)
+      sender ! "Cancelled"
+  }
+
+  def completed: Receive = {
+    case GetState(id) =>
+      log.info("I, [{}], completed my task", id)
+      sender ! "Completed"
   }
   //------------------------------------------------------------------------//
   // End Actor Receive Behavior
@@ -128,22 +162,30 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     //  After 30-80 messages sent it will send itself a CancelJob message which will cancel the Scheduler
     var messageCount: Int = 0
     def roundUp(f: Float) = math.ceil(f).toInt
-    val totalMessages:Float = 30 + (new scala.util.Random).nextInt((80 - 30) + 1) // random num between 30 and 80
-    computeJob = system.scheduler.schedule(500 milliseconds, 1000 milliseconds) {
+    val totalMessages:Float = 30 + (new scala.util.Random).nextInt((100 - 30) + 1) // random num between 30 and 100
+    computeJob = system.scheduler.schedule(250 milliseconds, 1000 milliseconds) {
 
-      messageCount = messageCount + 1
-      val percentComplete: Int = roundUp((messageCount / totalMessages) * 100)
+      if (messageCount >= totalMessages) self ! CompleteJob(id)
+
+      messageCount = messageCount + 1 // Increment messages sent
+
+      // Calculate percentage complete based on messages sent and randomly chosen total num of messages to send
+      // This basically simulates the amount of work that needs to be done
+      val percentComplete: Int = Math.min(roundUp((messageCount / totalMessages) * 100), 100)
       log.info("Job [{}] Complete - {}%", id, percentComplete)
+
+      // Ask yourself what state you are in, since this is an ASK, we need to Await Result
+      val future = self ? GetState(id)
+      val state = Await.result(future, TIMEOUT.duration).asInstanceOf[String]
 
       // Create new json to send over kafka
       val json = JsObject(
         "id" -> JsString(id),
+        "state" -> JsString(state),
         "socketeer" -> JsString(socketeer),
         "percent_done" -> JsNumber(percentComplete))
 
       kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, json.toString())
-
-      if (messageCount == totalMessages) self ! CancelJob(id)
     }
     /////////////////////////////////////////////////////////////////////////
 
