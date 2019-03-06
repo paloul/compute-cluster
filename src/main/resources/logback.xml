@@ -12,7 +12,7 @@
     <!-- log everything to a rolling file -->
     <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <!--TODO: have the rolling file location be a config param defined in application.conf-->
-        <file>logs/current.log</file>
+        <file>/logs/current.log</file>
         <append>true</append>
         <!-- set immediateFlush to false for much higher logging throughput -->
         <immediateFlush>true</immediateFlush>
@@ -24,7 +24,7 @@
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- daily rollover -->
             <!--TODO: have the rolling file location be a config param defined in application.conf-->
-            <fileNamePattern>logs/%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>/logs/%d{yyyy-MM-dd}.log</fileNamePattern>
             <!-- keep 60 days' worth of history -->
             <maxHistory>60</maxHistory>
             <!--capped at 3GB total size-->
