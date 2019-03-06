@@ -53,6 +53,8 @@ libraryDependencies ++= {
   )
 }
 
+// Settings for the docker image to be built
+// Look into Docker support for sbt-native-packager
 packageName in Docker := name.value
 version in Docker := version.value
 dockerBaseImage := "openjdk:8-stretch"
