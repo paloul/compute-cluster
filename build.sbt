@@ -1,10 +1,22 @@
 name := "ai.beyond.fpt.mvp.compute-agents"
 
+organization := "ai.beyond"
+
 version := "0.6.0"
 
 scalaVersion := "2.12.8"
 
 exportJars := true
+
+scalacOptions ++= Seq(
+  "-deprecation"
+  ,"-unchecked"
+  ,"-encoding", "UTF-8"
+  ,"-Xlint"
+  ,"-Xverify"
+  ,"-feature"
+  ,"-language:postfixOps"
+)
 
 libraryDependencies ++= {
   val json4sVersion = "3.6.4"
@@ -40,3 +52,9 @@ libraryDependencies ++= {
     "org.apache.kafka" % "kafka-clients" % "2.1.1"
   )
 }
+
+packageName in Docker := name.value
+version in Docker := version.value
+dockerBaseImage := "openjdk:8-stretch"
+dockerExposedPorts in Docker := Seq(5050, 5051, 5052, 2550, 2551, 2552)
+enablePlugins(JavaAppPackaging)
