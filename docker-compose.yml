@@ -1,0 +1,51 @@
+version: '3'
+
+services:
+  fpt-agents1:
+    image: ai.beyond.fpt.mvp.compute-agents:0.6.0
+    hostname: fpt-agents1
+    ports:
+      - '5050:5050'
+    environment:
+      HTTP.PORT: 5050
+      AKKA.HOST: fpt-agents1
+      AKKA.PORT: 2550
+      AKKA.SEED.HOST: fpt-agents1
+      AKKA.SEED.PORT: 2550
+      KAFKA.SERVERS: "kafka-1:19092,kafka-2:29092,kafka-3:39092"
+    volumes:
+      - ./logs/compute_agent1:/logs
+
+  fpt-agents2:
+    image: ai.beyond.fpt.mvp.compute-agents:0.6.0
+    hostname: fpt-agents2
+    ports:
+      - '5051:5051'
+    depends_on:
+      - fpt-agents1
+    environment:
+      HTTP.PORT: 5051
+      AKKA.HOST: fpt-agents2
+      AKKA.PORT: 2551
+      AKKA.SEED.HOST: fpt-agents1
+      AKKA.SEED.PORT: 2550
+      KAFKA.SERVERS: "kafka-1:19092,kafka-2:29092,kafka-3:39092"
+    volumes:
+      - ./logs/compute_agent2:/logs
+
+  fpt-agents3:
+    image: ai.beyond.fpt.mvp.compute-agents:0.6.0
+    hostname: fpt-agents3
+    ports:
+      - '5052:5052'
+    depends_on:
+      - fpt-agents1
+    environment:
+      HTTP.PORT: 5052
+      AKKA.HOST: fpt-agents3
+      AKKA.PORT: 2552
+      AKKA.SEED.HOST: fpt-agents1
+      AKKA.SEED.PORT: 2550
+      KAFKA.SERVERS: "kafka-1:19092,kafka-2:29092,kafka-3:39092"
+    volumes:
+      - ./logs/compute_agent3:/logs

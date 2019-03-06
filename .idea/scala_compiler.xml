@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ScalaCompilerConfiguration">
-    <profile name="sbt 1" modules="ai-beyond-fpt-mvp-compute-agents_8112,ai.beyond.fpt.mvp.compute-agents" />
+    <profile name="sbt 1" modules="ai-beyond-fpt-mvp-compute-agents_8112" />
+    <profile name="sbt 2" modules="ai.beyond.fpt.mvp.compute-agents">
+      <option name="postfixOps" value="true" />
+      <option name="deprecationWarnings" value="true" />
+      <option name="uncheckedWarnings" value="true" />
+      <option name="featureWarnings" value="true" />
+      <parameters>
+        <parameter value="-encoding" />
+        <parameter value="UTF-8" />
+        <parameter value="-Xlint" />
+        <parameter value="-Xverify" />
+      </parameters>
+    </profile>
   </component>
 </project>
