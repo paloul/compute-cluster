@@ -59,16 +59,17 @@ trait RestServiceSupport extends RequestTimeout {
       }
     }
 
-    // Capture the Enter key here to initiate the shutdown process properly
-    log.info("Press the 'enter' key to initiate shutdown...")
-    scala.io.StdIn.readLine() // ReadLine will wait until a new line is submitted
-    // Unbind from the port and shut down when down
-    bindingFuture
-      .flatMap(_.unbind())
-      .onComplete(_ => {
-          CoordinatedShutdown(system).run(new ShutdownRequested with CoordinatedShutdown.Reason)
-        }
-      )
+    // GKP: Disabled the following exit handler as caused issues with running inside Docker
+//    // Capture the Enter key here to initiate the shutdown process properly
+//    log.info("Press the 'enter' key to initiate shutdown...")
+//    scala.io.StdIn.readLine() // ReadLine will wait until a new line is submitted
+//    // Unbind from the port and shut down when down
+//    bindingFuture
+//      .flatMap(_.unbind())
+//      .onComplete(_ => {
+//          CoordinatedShutdown(system).run(new ShutdownRequested with CoordinatedShutdown.Reason)
+//        }
+//      )
 
   }
 }

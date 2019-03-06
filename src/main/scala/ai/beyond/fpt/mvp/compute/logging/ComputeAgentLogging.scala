@@ -2,8 +2,8 @@ package ai.beyond.fpt.mvp.compute.logging
 
 import ai.beyond.fpt.mvp.compute.agents.ComputeAgent
 import akka.actor.ActorLogging
-import akka.event.LoggingAdapter
-import org.slf4j.LoggerFactory
+//import akka.event.LoggingAdapter
+//import org.slf4j.LoggerFactory
 
 // Extend the ActorLogging Trait with ComputeAgentLogging trait
 // to add additional loggers for Job Status and Job Results
