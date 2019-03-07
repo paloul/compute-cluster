@@ -72,7 +72,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
 
   ///////////////////////
-  // Meta property object to store random
+  // Meta property object to store any meta data
   object META_PROPS {
     var percentComplete: Int = 0 // 0-100
   }
