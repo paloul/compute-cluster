@@ -179,7 +179,8 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     // FIXME: GKP - 2019-02-27
     //  This block just mimics potential compute being done
     //  It sets up a scheduler that sends out status messages over kafka using the KafkaProducer Agent
-    //  After 30-80 messages sent it will send itself a CancelJob message which will cancel the Scheduler
+    //  After 30-80 messages sent it will send itself a CompleteJob message which will cancel the Scheduler
+    //  and mark completion of the simulated job
     var messageCount: Int = 0
     def roundUp(f: Float) = math.ceil(f).toInt
     val totalMessages:Float = 30 + (new scala.util.Random).nextInt((100 - 30) + 1) // random num between 30 and 100
