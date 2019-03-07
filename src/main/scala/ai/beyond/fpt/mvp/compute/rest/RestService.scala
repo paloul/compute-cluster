@@ -9,7 +9,7 @@ import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server.Directives._
-import spray.json.{JsObject, JsString}
+import spray.json.{JsNumber, JsObject, JsString}
 
 import scala.concurrent.{Await, ExecutionContextExecutor}
 
@@ -86,11 +86,12 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
       pathPrefix("v1" / "api" / "compute" / "job" / UniqueIdString / "state" ) { id =>
         pathEndOrSingleSlash {
           val future = agents ? ComputeAgent.GetState(id)
-          val state = Await.result(future, timeout.duration).asInstanceOf[String]
+          val state = Await.result(future, timeout.duration).asInstanceOf[ComputeAgent.State]
 
           complete(JsObject(
             "id" -> JsString(id),
-            "state" -> JsString(state)))
+            "state" -> JsString(state.state),
+            "percentComplete" -> JsNumber(state.percentComplete)))
         }
       }
     }

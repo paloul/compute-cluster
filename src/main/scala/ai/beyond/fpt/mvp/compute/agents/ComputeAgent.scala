@@ -26,13 +26,22 @@ object ComputeAgent extends ShardedMessages {
   // function to see how its used, AlgorithmAgent.Message
   trait Message extends ShardedMessage
 
+  ///////////////////////
   // Messages specific to the Compute Agent
+  ///////////////////////
+  // Ask based Messages
   case class GetState(id: String) extends Message
+  case class State(id: String, state: String, percentComplete: Int) extends Message
+
+  // Tell based Messages
   case class CancelJob(id: String) extends Message
   case class CompleteJob(id: String) extends Message
+  case class InitiateCompute(id: String, partition: Int, socketeer: String) extends Message
+
+  // Sample help messages
   case class PrintPath(id: String) extends Message
   case class HelloThere(id: String, msgBody: String) extends Message
-  case class InitiateCompute(id: String, partition: Int, socketeer: String) extends Message
+  ///////////////////////
 
   ///////////////////////
   // Private Read-Only Parameters
@@ -46,7 +55,9 @@ object ComputeAgent extends ShardedMessages {
 // Collect json format instances into a support trait
 // Helps marshall the messages between JSON received via HTTP APIs
 trait ComputeAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
+  // Add any messages that you need to be marshalled back and forth from/to json
   implicit val itemFormat = jsonFormat3(ComputeAgent.InitiateCompute)
+  implicit val stateFormat = jsonFormat3(ComputeAgent.State)
 }
 
 class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonSupport {
@@ -58,6 +69,15 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // self.path.name is the entity identifier (utf-8 URL-encoded)
   def agentPath: String = self.path.toStringWithoutAddress
   def agentName: String = self.path.name
+
+
+  ///////////////////////
+  // Meta property object to store random
+  object META_PROPS {
+    var percentComplete: Int = 0 // 0-100
+  }
+  ///////////////////////
+
 
   /////////////////////////////////////////////////////////////////////////
   // FIXME: GKP - 2019-02-27
@@ -98,7 +118,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def idle: Receive = {
     case GetState(id) =>
       log.info("I, [{}], am in an Idle state of mind", id)
-      sender ! "Idle"
+      sender ! State(id, "Idle", META_PROPS.percentComplete)
 
     case PrintPath(id) =>
       log.info("My, [{}], path is {}", id, agentPath)
@@ -117,7 +137,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def computing: Receive = {
     case GetState(id) =>
       log.info("I, [{}], have been computing tirelessly", id)
-      sender ! "Running"
+      sender ! State(id, "Running", META_PROPS.percentComplete)
 
     case CompleteJob(id) =>
       log.info("Finalizing the Compute Job [{}] and marking completion", id)
@@ -135,13 +155,13 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def cancelled: Receive = {
     case GetState(id) =>
       log.info("I, [{}], have been cancelled", id)
-      sender ! "Cancelled"
+      sender ! State(id, "Cancelled", META_PROPS.percentComplete)
   }
 
   def completed: Receive = {
     case GetState(id) =>
       log.info("I, [{}], completed my task", id)
-      sender ! "Completed"
+      sender ! State(id, "Completed", META_PROPS.percentComplete)
   }
   //------------------------------------------------------------------------//
   // End Actor Receive Behavior
@@ -171,19 +191,18 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
       // Calculate percentage complete based on messages sent and randomly chosen total num of messages to send
       // This basically simulates the amount of work that needs to be done
-      val percentComplete: Int = Math.min(roundUp((messageCount / totalMessages) * 100), 100)
-      log.info("Job [{}] Complete - {}%", id, percentComplete)
+      this.META_PROPS.percentComplete = Math.min(roundUp((messageCount / totalMessages) * 100), 100)
 
       // Ask yourself what state you are in, since this is an ASK, we need to Await Result
-      val future = self ? GetState(id)
-      val state = Await.result(future, TIMEOUT.duration).asInstanceOf[String]
+      val future = self ? GetState(id) // GetState returns back a State message
+      val state = Await.result(future, TIMEOUT.duration).asInstanceOf[State]
 
       // Create new json to send over kafka
       val json = JsObject(
         "id" -> JsString(id),
-        "state" -> JsString(state),
+        "state" -> JsString(state.state),
         "socketeer" -> JsString(socketeer),
-        "percent_done" -> JsNumber(percentComplete))
+        "percentComplete" -> JsNumber(state.percentComplete))
 
       kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, json.toString())
     }
