@@ -117,7 +117,8 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
             })
 
             // Collect all futures that we're running in parallel
-            val futureWithList = Future.sequence(futures) // This is ListBuffer[ComputeAgent.State]
+            // This now becomes a Future[ListBuffer[ComputeAgent.State]]
+            val futureWithList = Future.sequence(futures)
 
             // Wait for all results to come in then create list of ComputeAgent.State
             val states = Await.result(futureWithList, timeout.duration)
