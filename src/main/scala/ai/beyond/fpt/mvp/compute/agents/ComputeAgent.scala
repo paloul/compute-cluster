@@ -11,6 +11,8 @@ import akka.pattern.ask
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+import java.time.Instant
+
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
 // functions can apply, 2) the basic Stop message is inherited,
@@ -31,7 +33,7 @@ object ComputeAgent extends ShardedMessages {
   ///////////////////////
   // Ask based Messages
   case class GetState(id: String) extends Message
-  case class State(id: String, state: String, percentComplete: Int) extends Message
+  case class State(id: String, state: String, percentComplete: Int, lastUpdated: Long) extends Message
 
   // Tell based Messages
   case class CancelJob(id: String) extends Message
@@ -57,7 +59,7 @@ object ComputeAgent extends ShardedMessages {
 trait ComputeAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   // Add any messages that you need to be marshalled back and forth from/to json
   implicit val itemFormat = jsonFormat3(ComputeAgent.InitiateCompute)
-  implicit val stateFormat = jsonFormat3(ComputeAgent.State)
+  implicit val stateFormat = jsonFormat4(ComputeAgent.State)
 }
 
 class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonSupport {
@@ -75,6 +77,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // Meta property object to store any meta data
   object META_PROPS {
     var percentComplete: Int = 0 // 0-100
+    var lastKnownUpdate: Long = 0
   }
   ///////////////////////
 
@@ -118,7 +121,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def idle: Receive = {
     case GetState(id) =>
       log.info("I, [{}], am in an Idle state of mind", id)
-      sender ! State(id, "Idle", META_PROPS.percentComplete)
+      sender ! State(id, "Idle", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
 
     case PrintPath(id) =>
       log.info("My, [{}], path is {}", id, agentPath)
@@ -137,7 +140,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def computing: Receive = {
     case GetState(id) =>
       log.info("I, [{}], have been computing tirelessly", id)
-      sender ! State(id, "Running", META_PROPS.percentComplete)
+      sender ! State(id, "Running", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
 
     case CompleteJob(id) =>
       log.info("Finalizing the Compute Job [{}] and marking completion", id)
@@ -155,13 +158,13 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def cancelled: Receive = {
     case GetState(id) =>
       log.info("I, [{}], have been cancelled", id)
-      sender ! State(id, "Cancelled", META_PROPS.percentComplete)
+      sender ! State(id, "Cancelled", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
   }
 
   def completed: Receive = {
     case GetState(id) =>
       log.info("I, [{}], completed my task", id)
-      sender ! State(id, "Completed", META_PROPS.percentComplete)
+      sender ! State(id, "Completed", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
   }
   //------------------------------------------------------------------------//
   // End Actor Receive Behavior
@@ -193,6 +196,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
       // Calculate percentage complete based on messages sent and randomly chosen total num of messages to send
       // This basically simulates the amount of work that needs to be done
       this.META_PROPS.percentComplete = Math.min(roundUp((messageCount / totalMessages) * 100), 100)
+      this.META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
 
       // Ask yourself what state you are in, since this is an ASK, we need to Await Result
       val future = self ? GetState(id) // GetState returns back a State message
