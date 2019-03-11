@@ -49,7 +49,9 @@ libraryDependencies ++= {
     "org.json4s" %% "json4s-native" % json4sVersion,
     "org.json4s" %% "json4s-ext" % json4sVersion,
 
-    "org.apache.kafka" % "kafka-clients" % "2.1.1"
+    "org.apache.kafka" % "kafka-clients" % "2.1.1",
+
+    "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0"
   )
 }
 
