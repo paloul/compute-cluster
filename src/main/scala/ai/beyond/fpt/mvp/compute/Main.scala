@@ -1,6 +1,6 @@
 package ai.beyond.fpt.mvp.compute
 
-import ai.beyond.fpt.mvp.compute.agents.KafkaProducerAgent
+import ai.beyond.fpt.mvp.compute.agents.{KafkaProducerAgent, MongoDbAgent}
 import ai.beyond.fpt.mvp.compute.rest.RestServiceSupport
 import ai.beyond.fpt.mvp.compute.sharded.ShardedAgents
 import akka.actor.ActorSystem
@@ -29,6 +29,15 @@ object Main extends App with RestServiceSupport {
   //  allow for the capability to alter the Supervision and restart any Producer
   //  agent that crash due to underlying kafka library or whatever reason
   system.actorOf(KafkaProducerAgent.props(settings), KafkaProducerAgent.name)
+
+  // Start the MongoDb Agent for this actor system. Each Actor System
+  // will have one MongoDb agent that handles all interaction for mongo.
+  // All agents contained within an actor system will interact with mongo
+  // through this actor/agent. Each MongoDb Agent is local to the Actor System.
+  // The underlying Mongo Scala Driver works with a pool of connections to
+  // the mongo db cluster. No need to create multiple MongoDb Agents. One per
+  // Actor System is suffice. 
+  system.actorOf(MongoDbAgent.props(settings), MongoDbAgent.name)
 
   // Get the main actor type to be used for sharded cluster of actors
   // ShardedAgents deals with identifying incoming requests and routing them
