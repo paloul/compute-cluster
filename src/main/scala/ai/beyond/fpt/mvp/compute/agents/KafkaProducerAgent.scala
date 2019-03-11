@@ -16,7 +16,7 @@ object KafkaProducerAgent {
 
   def name: String = "fpt-kafkaproducer-agent"
 
-  case class Message(topic: String, partition: Int, key: String, message: String)
+  case class Message(topic: String, key: String, message: String)
 }
 
 class KafkaProducerAgent extends Actor with ActorLogging {
@@ -55,14 +55,14 @@ class KafkaProducerAgent extends Actor with ActorLogging {
   //------------------------------------------------------------------------//
 
   override def receive: Receive = {
-    case Message(topic, partition, key, message) =>
+    case Message(topic, key, message) =>
       log.debug("KafkaProducer Agent - {} - Received message to produce message over Kafka", id)
-      produce(topic, partition, key, message)
+      produce(topic, key, message)
   }
 
-  def produce(topic: String, partition: Int, msgKey: String, msg: String): Unit = {
+  def produce(topic: String, msgKey: String, msg: String): Unit = {
 
-    val data = new ProducerRecord[String,String](topic, partition, msgKey, msg)
+    val data = new ProducerRecord[String,String](topic, msgKey, msg)
 
     // Send the message async
     if (kafkaProducer.isDefined) kafkaProducer.get.send(data, produceCallback)
