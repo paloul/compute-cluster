@@ -31,14 +31,14 @@ object ComputeAgent extends ShardedMessages {
   ///////////////////////
   // Messages specific to the Compute Agent
   ///////////////////////
-  // Ask based Messages
+  // Ask based Messages, usually in pairs to highlight question/answer pattern with diff message loads
   case class GetState(id: String) extends Message
   case class State(id: String, state: String, percentComplete: Int, lastUpdated: Long) extends Message
 
-  // Tell based Messages
+  // Tell based Messages, think of these as commands
   case class CancelJob(id: String) extends Message
   case class CompleteJob(id: String) extends Message
-  case class InitiateCompute(id: String, partition: Int, socketeer: String) extends Message
+  case class InitiateCompute(id: String, socketeer: String) extends Message
 
   // Sample help messages
   case class PrintPath(id: String) extends Message
@@ -50,6 +50,7 @@ object ComputeAgent extends ShardedMessages {
   private val TOPIC_JOBSTATUS: String = "job_status"
 
   // Default timeout for Ask patterns to other agents (even self)
+  // Implicit so it can just be used where necessary
   private implicit val TIMEOUT = Timeout(5 seconds)
   ///////////////////////
 }
@@ -58,7 +59,7 @@ object ComputeAgent extends ShardedMessages {
 // Helps marshall the messages between JSON received via HTTP APIs
 trait ComputeAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   // Add any messages that you need to be marshalled back and forth from/to json
-  implicit val itemFormat = jsonFormat3(ComputeAgent.InitiateCompute)
+  implicit val itemFormat = jsonFormat2(ComputeAgent.InitiateCompute)
   implicit val stateFormat = jsonFormat4(ComputeAgent.State)
 }
 
@@ -77,7 +78,8 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // Meta property object to store any meta data
   object META_PROPS {
     var percentComplete: Int = 0 // 0-100
-    var lastKnownUpdate: Long = 0
+    var lastKnownUpdate: Long = 0 // UNIX Timestamp
+    var socketeer: String = "" // socketeer owner
   }
   ///////////////////////
 
@@ -129,9 +131,13 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
 
-    case InitiateCompute(id, partition, socketeer) =>
+    case InitiateCompute(id, socketeer) =>
       log.info("Initiating compute job with ID[{}]", id)
-      runCompute(id, partition, socketeer)
+      // Store any meta data properties given
+      META_PROPS.socketeer = socketeer
+      runCompute(id)
+
+      sender ! State(id, "Initiating", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
 
       become(computing)
   }
@@ -174,8 +180,11 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
-  def runCompute(id: String, partition: Int, socketeer: String): Unit = {
+  def runCompute(id: String): Unit = {
 
+    // Get a reference to the kafka producer agent. This can potentially moved to
+    // higher up to the agent lifecycle methods, but for now it is here, to ensure
+    // the reference to the producer agent is always up to date.
     val kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
 
     /////////////////////////////////////////////////////////////////////////
@@ -206,10 +215,10 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
       val json = JsObject(
         "id" -> JsString(id),
         "state" -> JsString(state.state),
-        "socketeer" -> JsString(socketeer),
+        "socketeer" -> JsString(META_PROPS.socketeer),
         "percentComplete" -> JsNumber(state.percentComplete))
 
-      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, partition, id, json.toString())
+      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, id, json.toString())
     }
     /////////////////////////////////////////////////////////////////////////
 

@@ -62,8 +62,10 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
       pathPrefix("v1" / "api" / "compute" / "job" / "initiate") {
         pathEndOrSingleSlash {
           entity(as[ComputeAgent.InitiateCompute]) { initiate =>
-            agents ! ComputeAgent.InitiateCompute(initiate.id, initiate.partition, initiate.socketeer)
-            complete(OK)
+            val future = agents ? ComputeAgent.InitiateCompute(initiate.id, initiate.socketeer)
+            val state = Await.result(future, timeout.duration).asInstanceOf[ComputeAgent.State]
+
+            complete(state)
           }
         }
       }
