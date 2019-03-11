@@ -35,8 +35,7 @@ object Main extends App with RestServiceSupport {
   // All agents contained within an actor system will interact with mongo
   // through this actor/agent. Each MongoDb Agent is local to the Actor System.
   // The underlying Mongo Scala Driver works with a pool of connections to
-  // the mongo db cluster. No need to create multiple MongoDb Agents. One per
-  // Actor System is suffice. 
+  // the mongo db cluster. No need to create multiple MongoDb Agents.
   system.actorOf(MongoDbAgent.props(settings), MongoDbAgent.name)
 
   // Get the main actor type to be used for sharded cluster of actors
