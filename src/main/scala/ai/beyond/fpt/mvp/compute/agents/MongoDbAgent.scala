@@ -87,11 +87,14 @@ class MongoDbAgent extends Actor with ActorLogging {
       // Explicitly subscribe to activate execution of insertOne
       observable.subscribe(new Observer[Completed] {
 
-        override def onNext(result: Completed): Unit = log.info("Compute Job MetaData inserted: {}", doc.toString())
+        override def onNext(result: Completed): Unit =
+          log.info("Compute Job [{}] MetaData inserted: {}", id, doc.toString())
 
-        override def onError(e: Throwable): Unit = log.error("Compute Job MetaData failed: {}", doc.toString())
+        override def onError(e: Throwable): Unit =
+          log.error("Compute Job [{}] MetaData failed: {}", id, doc.toString())
 
-        override def onComplete(): Unit = log.info("Compute Job MetaData completed: {}", doc.toString())
+        override def onComplete(): Unit =
+          log.info("Compute Job [{}] MetaData completed: {}", id, doc.toString())
       })
 
     }
