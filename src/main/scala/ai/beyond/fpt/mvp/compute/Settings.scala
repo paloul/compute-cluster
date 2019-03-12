@@ -62,6 +62,14 @@ class Settings(config: Config) extends Extension {
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   }
 
+  object mongo {
+
+    val uri: String = config.getString("application.mongo.uri")
+    val database: String = config.getString("application.mongo.database")
+    val computeAgentJobsCollection: String = config.getString("application.mongo.compute-agent-jobs.collection")
+
+  }
+
   // ******************************************************************************
   // Any additional custom settings can be added here.
   // Anything added here should also reside in the application.conf file (if you intend to use it - obviously)
