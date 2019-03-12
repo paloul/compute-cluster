@@ -10,8 +10,9 @@ import akka.pattern.ask
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-
 import java.time.Instant
+
+import ai.beyond.fpt.mvp.compute.agents.MongoDbAgent.{ComputeJobMetaData}
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
@@ -38,12 +39,15 @@ object ComputeAgent extends ShardedMessages {
   // Tell based Messages, think of these as commands
   case class CancelJob(id: String) extends Message
   case class CompleteJob(id: String) extends Message
-  case class InitiateCompute(id: String, socketeer: String) extends Message
+  // InitiateCompute is a special case, even though it sounds like a Tell message, it still replies
+  // back to the sender with a State message. This is to inform the caller that initiate was successful
+  case class InitiateCompute(id: String, name: String, owner: String, socketeer: String) extends Message
 
   // Sample help messages
   case class PrintPath(id: String) extends Message
   case class HelloThere(id: String, msgBody: String) extends Message
   ///////////////////////
+
 
   ///////////////////////
   // Private Read-Only Parameters
@@ -59,7 +63,7 @@ object ComputeAgent extends ShardedMessages {
 // Helps marshall the messages between JSON received via HTTP APIs
 trait ComputeAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   // Add any messages that you need to be marshalled back and forth from/to json
-  implicit val itemFormat = jsonFormat2(ComputeAgent.InitiateCompute)
+  implicit val itemFormat = jsonFormat4(ComputeAgent.InitiateCompute)
   implicit val stateFormat = jsonFormat4(ComputeAgent.State)
 }
 
@@ -73,13 +77,19 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   def agentPath: String = self.path.toStringWithoutAddress
   def agentName: String = self.path.name
 
+  // Get a reference to the helper agents. This should be updated in the
+  // the agent lifecycle methods. TODO: Before using the ref maybe check if valid
+  var mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+  var kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
 
   ///////////////////////
   // Meta property object to store any meta data
   object META_PROPS {
+    var name: String = ""
+    var owner: String = ""
     var percentComplete: Int = 0 // 0-100
     var lastKnownUpdate: Long = 0 // UNIX Timestamp
-    var socketeer: String = "" // socketeer owner
+    var socketeer: String = "" // socketeer
   }
   ///////////////////////
 
@@ -97,6 +107,10 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
     log.info("Compute Agent - {} - starting", agentPath)
+
+    // Get reference to helper agents
+    mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+    kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -104,6 +118,10 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     log.error(reason, "Compute Agent restarting due to [{}] when processing [{}]",
       reason.getMessage, message.getOrElse(""))
     super.preRestart(reason, message)
+
+    // Get reference to helper agents
+    mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+    kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
   }
 
   override def postStop(): Unit = {
@@ -131,13 +149,18 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
 
-    case InitiateCompute(id, socketeer) =>
+    case InitiateCompute(id, name, owner, socketeer) =>
       log.info("Initiating compute job with ID[{}]", id)
-      // Store any meta data properties given
+      // Store any meta data properties that were given
+      META_PROPS.name = name
+      META_PROPS.owner = owner
       META_PROPS.socketeer = socketeer
-      runCompute(id)
+      // Store these metadata into Mongo
+      mongoDbAgentRef ! ComputeJobMetaData(id, name, owner, socketeer)
 
       sender ! State(id, "Initiating", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
+
+      runCompute(id) // Start the compute
 
       become(computing)
   }
@@ -181,11 +204,6 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // Begin Compute Functions
   //------------------------------------------------------------------------//
   def runCompute(id: String): Unit = {
-
-    // Get a reference to the kafka producer agent. This can potentially moved to
-    // higher up to the agent lifecycle methods, but for now it is here, to ensure
-    // the reference to the producer agent is always up to date.
-    val kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
 
     /////////////////////////////////////////////////////////////////////////
     // FIXME: GKP - 2019-02-27

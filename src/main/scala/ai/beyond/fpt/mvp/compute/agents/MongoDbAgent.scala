@@ -1,8 +1,10 @@
 package ai.beyond.fpt.mvp.compute.agents
 
+import org.mongodb.scala._
+
 import ai.beyond.fpt.mvp.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props}
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
 
 object MongoDbAgent {
   var mySettings: Option[Settings] = None
@@ -16,7 +18,8 @@ object MongoDbAgent {
 
   def name: String = "fpt-mongodb-agent"
 
-  case class Message(topic: String, key: String, message: String)
+  // Messages required to put data into Mongo, i.e. StoreJob(...)
+  case class ComputeJobMetaData(id: String, name: String, owner: String, socketeer: String)
 }
 
 class MongoDbAgent extends Actor with ActorLogging {
@@ -26,53 +29,71 @@ class MongoDbAgent extends Actor with ActorLogging {
   // self.path.name is the entity identifier (utf-8 URL-encoded)
   def id: String = self.path.name
 
-  //TODO: Mod this var kafkaProducer: Option[KafkaProducer[String, String]] = None
+  // Reference to mongo client
+  var mongoClient: Option[MongoClient] = None
+  var mongoDatabase: Option[MongoDatabase] = None
 
   //------------------------------------------------------------------------//
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    log.info("KafkaProducer Agent - {} - starting", id)
+    log.info("MongoDb Agent - {} - starting", id)
 
-    // Create a kafka producer using the settings ingested from the app.conf and stored in Settings class
-    //TODO: Mod this kafkaProducer = Some(new KafkaProducer[String, String](mySettings.get.kafka.props))
+    // Create a mongo client and database using the settings ingested from the app.conf and stored in Settings class
+    mongoClient = Some(MongoClient(mySettings.get.mongo.uri))
+    if (mongoClient.isDefined) mongoDatabase = Some(mongoClient.get.getDatabase(mySettings.get.mongo.database))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // Debugging information if agent is restarted
-    log.error(reason, "KafkaProducer Agent restarting due to [{}] when processing [{}]",
+    log.error(reason, "MongoDb Agent restarting due to [{}] when processing [{}]",
       reason.getMessage, message.getOrElse(""))
     super.preRestart(reason, message)
   }
 
   override def postStop(): Unit = {
-    log.info("KafkaProducer Agent - {} - stopped", id)
+    log.info("MongoDb Agent - {} - stopped", id)
 
-    //TODO: Mod this if (kafkaProducer.isDefined) kafkaProducer.get.close()
+    // Close connections to mongo client
+    if (mongoClient.isDefined) mongoClient.get.close()
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
   //------------------------------------------------------------------------//
 
   override def receive: Receive = {
-    case Message(topic, key, message) =>
-      log.debug("KafkaProducer Agent - {} - Received message to produce message over Kafka", id)
-      produce(topic, key, message)
+    case ComputeJobMetaData(id, name, owner, socketeer) =>
+      log.debug("MongoDb Agent - {} - Received message to store in Mongo", id)
+      saveComputeJobMetaData(id, name, owner, socketeer)
   }
 
-  def produce(topic: String, msgKey: String, msg: String): Unit = {
+  def saveComputeJobMetaData(id: String, name: String, owner: String, socketeer: String): Unit = {
 
-    val data = new ProducerRecord[String,String](topic, msgKey, msg)
+    if (mongoDatabase.isEmpty) {
+      log.warning("Mongo Database not correctly initialized. Missing Database connection")
+    }
 
-    // Send the message async
-    //TODO: Mod this if (kafkaProducer.isDefined) kafkaProducer.get.send(data, produceCallback)
-  }
+    if (mongoDatabase.isDefined) {
+      // Get collection to store job meta data to
+      val collection: MongoCollection[Document] =
+        mongoDatabase.get.getCollection(mySettings.get.mongo.computeAgentJobsCollection)
 
-  private val produceCallback = new Callback {
+      // Create the BSON. ID needs to be _id in the actual Document so that Mongo will treat it as defacto ID of doc
+      val doc: Document = Document("_id" -> id, "name" -> name, "owner" -> owner, "socketeer" -> socketeer)
 
-    // TODO: Build out this onCompletion method and check for potential exception in body
-    override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-      log.debug("published: " + metadata.toString)
+      // In the API all methods returning a Observables are “cold” streams meaning that
+      // nothing happens until they are Subscribed to. This is more commonly known as lazy loading
+      val observable: Observable[Completed] = collection.insertOne(doc)
+      // Explicitly subscribe to activate execution of insertOne
+      observable.subscribe(new Observer[Completed] {
+
+        override def onNext(result: Completed): Unit = log.info("Compute Job MetaData inserted: {}", doc.toString())
+
+        override def onError(e: Throwable): Unit = log.error("Compute Job MetaData failed: {}", doc.toString())
+
+        override def onComplete(): Unit = log.info("Compute Job MetaData completed: {}", doc.toString())
+      })
+
     }
 
   }
