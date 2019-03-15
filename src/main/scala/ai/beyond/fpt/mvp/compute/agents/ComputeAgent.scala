@@ -184,12 +184,14 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
       become(cancelled)
   }
 
+  // Cancelled behavior state
   def cancelled: Receive = {
     case GetState(id) =>
       log.info("I, [{}], have been cancelled", id)
       sender ! State(id, "Cancelled", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
   }
 
+  // Completed behavior state
   def completed: Receive = {
     case GetState(id) =>
       log.info("I, [{}], completed my task", id)
