@@ -1,10 +1,8 @@
-package ai.beyond.fpt.mvp.compute.agents
-
-import org.mongodb.scala._
+package ai.beyond.fpt.mvp.compute.agents.db
 
 import ai.beyond.fpt.mvp.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props}
-import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
+import org.mongodb.scala._
 
 object MongoDbAgent {
   var mySettings: Option[Settings] = None

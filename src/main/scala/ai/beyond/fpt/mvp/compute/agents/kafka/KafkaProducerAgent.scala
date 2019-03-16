@@ -1,4 +1,4 @@
-package ai.beyond.fpt.mvp.compute.agents
+package ai.beyond.fpt.mvp.compute.agents.kafka
 
 import ai.beyond.fpt.mvp.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props}

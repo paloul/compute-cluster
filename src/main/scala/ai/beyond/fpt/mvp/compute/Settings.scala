@@ -51,6 +51,9 @@ class Settings(config: Config) extends Extension {
     val bufferMemory: String = config.getString("application.kafka.buffer.memory")
     val maxBlockMilliSeconds: String = config.getString("application.kafka.max.block.ms")
 
+    // This one is used by Kafka Master Agent
+    val numberProducerAgents: Int = config.getInt("application.kafka.num-producer-agents")
+
     val props = new Properties()
     props.put("acks", acks)
     props.put("buffer.memory", bufferMemory)
