@@ -46,6 +46,9 @@
     <!-- Turn down Kafka noise -->
     <logger name="org.apache.kafka" level="WARN" />
 
+    <!-- Turn down mongo noise -->
+    <logger name="org.mongodb.driver" level="WARN" />
+
     <root name="root" level="DEBUG" additivity="TRUE">
         <appender-ref ref="ROLLING_FILE" />
         <appender-ref ref="STDOUT" />
