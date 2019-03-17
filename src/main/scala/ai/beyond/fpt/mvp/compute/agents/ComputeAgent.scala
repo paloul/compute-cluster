@@ -12,7 +12,9 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.time.Instant
 
-import ai.beyond.fpt.mvp.compute.agents.MongoDbAgent.{ComputeJobMetaData}
+import ai.beyond.fpt.mvp.compute.agents.db.MongoDbAgent
+import ai.beyond.fpt.mvp.compute.agents.db.MongoDbAgent.ComputeJobMetaData
+import ai.beyond.fpt.mvp.compute.agents.kafka.{KafkaMasterAgent, KafkaProducerAgent}
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard
@@ -80,7 +82,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
   // Get a reference to the helper agents. This should be updated in the
   // the agent lifecycle methods. TODO: Before using the ref maybe check if valid
   var mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
-  var kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
+  var kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
 
   ///////////////////////
   // Meta property object to store any meta data
@@ -110,7 +112,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
     // Get reference to helper agents
     mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
-    kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
+    kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -121,7 +123,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
     // Get reference to helper agents
     mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
-    kafkaProducerAgentRef = actorSelection("/user/" + KafkaProducerAgent.name)
+    kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
   }
 
   override def postStop(): Unit = {
@@ -238,7 +240,8 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
         "socketeer" -> JsString(META_PROPS.socketeer),
         "percentComplete" -> JsNumber(state.percentComplete))
 
-      kafkaProducerAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, id, json.toString())
+      // Send the kafka master agent a message to send over kafka via its producer agent children
+      kafkaMasterAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, id, json.toString())
     }
     /////////////////////////////////////////////////////////////////////////
 

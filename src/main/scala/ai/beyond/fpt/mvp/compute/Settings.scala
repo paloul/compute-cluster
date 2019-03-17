@@ -45,13 +45,14 @@ class Settings(config: Config) extends Extension {
   }
 
   object kafka {
+    // All these are used by the underlying kafka library
     val bootstrapServers: String = config.getString("application.kafka.bootstrap.servers")
     val lingerMilliSeconds: String = config.getString("application.kafka.linger.ms")
     val acks: String = config.getString("application.kafka.acks")
     val bufferMemory: String = config.getString("application.kafka.buffer.memory")
     val maxBlockMilliSeconds: String = config.getString("application.kafka.max.block.ms")
 
-    // This one is used by Kafka Master Agent
+    // This one is used by Kafka Master Agent, defines number of children workers to start
     val numberProducerAgents: Int = config.getInt("application.kafka.num-producer-agents")
 
     val props = new Properties()

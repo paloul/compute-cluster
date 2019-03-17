@@ -1,17 +1,11 @@
 package ai.beyond.fpt.mvp.compute.agents.kafka
 
-import ai.beyond.fpt.mvp.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props}
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
 
 object KafkaProducerAgent {
-  var mySettings: Option[Settings] = None
-
-  def props(settings: Settings) = {
-
-    mySettings = Some(settings)
-
-    Props(new KafkaProducerAgent)
+  def props(producer: KafkaProducer[String, String]) = {
+    Props(new KafkaProducerAgent(producer))
   }
 
   def name: String = "fpt-kafkaproducer-agent"
@@ -19,23 +13,18 @@ object KafkaProducerAgent {
   case class Message(topic: String, key: String, message: String)
 }
 
-class KafkaProducerAgent extends Actor with ActorLogging {
+class KafkaProducerAgent(val producer: KafkaProducer[String, String]) extends Actor with ActorLogging {
   // Import the companion object above to use the messages defined for us
   import KafkaProducerAgent._
 
   // self.path.name is the entity identifier (utf-8 URL-encoded)
   def id: String = self.path.name
 
-  var kafkaProducer: Option[KafkaProducer[String, String]] = None
-
   //------------------------------------------------------------------------//
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
     log.info("KafkaProducer Agent - {} - starting", id)
-
-    // Create a kafka producer using the settings ingested from the app.conf and stored in Settings class
-    kafkaProducer = Some(new KafkaProducer[String, String](mySettings.get.kafka.props))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -47,8 +36,6 @@ class KafkaProducerAgent extends Actor with ActorLogging {
 
   override def postStop(): Unit = {
     log.info("KafkaProducer Agent - {} - stopped", id)
-
-    if (kafkaProducer.isDefined) kafkaProducer.get.close()
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
@@ -65,7 +52,7 @@ class KafkaProducerAgent extends Actor with ActorLogging {
     val data = new ProducerRecord[String,String](topic, msgKey, msg)
 
     // Send the message async
-    if (kafkaProducer.isDefined) kafkaProducer.get.send(data, produceCallback)
+    producer.send(data, produceCallback)
   }
 
   private val produceCallback = new Callback {

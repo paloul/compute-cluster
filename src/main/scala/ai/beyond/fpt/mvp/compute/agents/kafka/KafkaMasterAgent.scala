@@ -3,14 +3,21 @@ package ai.beyond.fpt.mvp.compute.agents.kafka
 import ai.beyond.fpt.mvp.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
+import org.apache.kafka.clients.producer.KafkaProducer
 
 object KafkaMasterAgent {
 
   var mySettings: Option[Settings] = None
+  var kafkaProducer: Option[KafkaProducer[String, String]] = None
 
   def props(settings: Settings) = {
 
     mySettings = Some(settings)
+
+    // Create a kafka producer using the settings ingested from the app.conf and stored in Settings class
+    // Reference to this producer is passed down to the children to use, we close the kafka producer
+    // in the master, when the master is shutdown, the children don't have to deal with closing it
+    kafkaProducer = Some(new KafkaProducer[String, String](mySettings.get.kafka.props))
 
     Props(new KafkaMasterAgent)
   }
@@ -31,11 +38,12 @@ class KafkaMasterAgent extends Actor with ActorLogging {
   // Create the routees as ordinary child actors wrapped in ActorRefRoutee.
   // Watch the routees to be able to replace them if they are terminated with context watch r
   // In the actual Receive func block we will look for Terminated message and recreate kid(s) as necessary
+  // Since, the master starts the children and is watching them, when the master is shutdown, so do the children
   var router = {
     // Automatically fill a vector with x number of Kafka Producers (defined in app.conf/settings helper)
     val routees = Vector.fill(mySettings.get.kafka.numberProducerAgents) {
       // Create a child Kafka Producer
-      val routee = context.actorOf(Props[KafkaProducerAgent])
+      val routee = context.actorOf(KafkaProducerAgent.props(kafkaProducer.get))
       // Watch the new child Kafka Producer
       context watch routee
       // Get routee actor ref to be put in vector
@@ -62,6 +70,11 @@ class KafkaMasterAgent extends Actor with ActorLogging {
 
   override def postStop(): Unit = {
     log.info("KafkaMaster Agent - {} - stopped", id)
+
+    if (kafkaProducer.isDefined) {
+      kafkaProducer.get.close()
+      kafkaProducer = None
+    }
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle
@@ -78,7 +91,7 @@ class KafkaMasterAgent extends Actor with ActorLogging {
       // Remove terminated child from current router routee list
       router = router.removeRoutee(a)
       // Create a new child Kafka Producer
-      val r = context.actorOf(Props[KafkaProducerAgent])
+      val r = context.actorOf(KafkaProducerAgent.props(kafkaProducer.get))
       // Watch the new child Kafka Producer
       context watch r
       // Add the new child Kafka Producer to our router
