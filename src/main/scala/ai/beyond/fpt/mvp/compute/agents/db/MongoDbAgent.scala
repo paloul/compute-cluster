@@ -16,8 +16,21 @@ object MongoDbAgent {
 
   def name: String = "fpt-mongodb-agent"
 
-  // Messages required to put data into Mongo, i.e. StoreJob(...)
-  case class ComputeJobMetaData(id: String, name: String, owner: String, socketeer: String)
+  // Trait for all Mongo Messages, all messages below should extend this trait
+  // This is so that we can more easily forward with a router all messages with base Mongo Message
+  trait MongoMessage {
+    val collection: String // The collection where to put the data
+  }
+
+  ///////////////////////
+  // Messages our MongoDbAgent can receive
+  ///////////////////////
+  // Compute Job Meta Data message to store metadata of compute jobs to mongo
+  // Remember in Scala, default parameters should be towards the end or else you need to define each param
+  // in the call to the function/class specifically i.e. ComputeJobMetaData(id=idstr, name=namestr, etc)
+  case class ComputeJobMetaData(id: String, name: String, owner: String, socketeer: String,
+                collection: String = mySettings.get.mongo.computeAgentJobsCollection) extends MongoMessage
+  ///////////////////////
 }
 
 class MongoDbAgent extends Actor with ActorLogging {
@@ -60,12 +73,12 @@ class MongoDbAgent extends Actor with ActorLogging {
   //------------------------------------------------------------------------//
 
   override def receive: Receive = {
-    case ComputeJobMetaData(id, name, owner, socketeer) =>
+    case ComputeJobMetaData(collection, id, name, owner, socketeer) =>
       log.debug("MongoDb Agent - {} - Received message to store in Mongo", id)
-      saveComputeJobMetaData(id, name, owner, socketeer)
+      saveComputeJobMetaData(collection, id, name, owner, socketeer)
   }
 
-  def saveComputeJobMetaData(id: String, name: String, owner: String, socketeer: String): Unit = {
+  def saveComputeJobMetaData(collection: String, id: String, name: String, owner: String, socketeer: String): Unit = {
 
     if (mongoDatabase.isEmpty) {
       log.warning("Mongo Database not correctly initialized. Missing Database connection")
@@ -73,15 +86,15 @@ class MongoDbAgent extends Actor with ActorLogging {
 
     if (mongoDatabase.isDefined) {
       // Get collection to store job meta data to
-      val collection: MongoCollection[Document] =
-        mongoDatabase.get.getCollection(mySettings.get.mongo.computeAgentJobsCollection)
+      val col: MongoCollection[Document] = mongoDatabase.get.getCollection(collection)
 
       // Create the BSON. ID needs to be _id in the actual Document so that Mongo will treat it as defacto ID of doc
+      // Here the ID is actually the Job ID, it is unique and there should be only one entry of ID in the Mongo Coll
       val doc: Document = Document("_id" -> id, "name" -> name, "owner" -> owner, "socketeer" -> socketeer)
 
       // In the API all methods returning a Observables are “cold” streams meaning that
       // nothing happens until they are Subscribed to. This is more commonly known as lazy loading
-      val observable: Observable[Completed] = collection.insertOne(doc)
+      val observable: Observable[Completed] = col.insertOne(doc)
       // Explicitly subscribe to activate execution of insertOne
       observable.subscribe(new Observer[Completed] {
 

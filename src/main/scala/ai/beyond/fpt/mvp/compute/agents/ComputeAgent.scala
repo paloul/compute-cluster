@@ -157,7 +157,9 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
       META_PROPS.name = name
       META_PROPS.owner = owner
       META_PROPS.socketeer = socketeer
-      // Store these metadata into Mongo
+
+      // Store these metadata into Mongo, the message is defined in the Mongo Agent
+      // ComputeJobMetaData like all MongoMessages has a default param defining the Mongo Collection
       mongoDbAgentRef ! ComputeJobMetaData(id, name, owner, socketeer)
 
       sender ! State(id, "Initiating", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
