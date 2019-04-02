@@ -16,15 +16,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="sbt: ch.qos.logback:logback-classic:1.2.3:jar" level="project" />
-    <orderEntry type="module-library">
-      <library name="sbt: unmanaged-jars">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../lib/jnats-2.4.1.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
     <orderEntry type="library" name="sbt: org.json4s:json4s-scalap_2.12:3.6.4:jar" level="project" />
     <orderEntry type="library" name="sbt: org.json4s:json4s-native_2.12:3.6.4:jar" level="project" />
     <orderEntry type="library" name="sbt: org.json4s:json4s-ext_2.12:3.6.4:jar" level="project" />
