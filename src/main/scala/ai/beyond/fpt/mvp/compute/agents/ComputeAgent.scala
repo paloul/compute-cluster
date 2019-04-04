@@ -12,7 +12,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.time.Instant
 
-import ai.beyond.fpt.mvp.compute.agents.db.MongoDbAgent
+import ai.beyond.fpt.mvp.compute.agents.db.{MongoMasterAgent}
 import ai.beyond.fpt.mvp.compute.agents.db.MongoDbAgent.ComputeJobMetaData
 import ai.beyond.fpt.mvp.compute.agents.kafka.{KafkaMasterAgent, KafkaProducerAgent}
 
@@ -57,7 +57,7 @@ object ComputeAgent extends ShardedMessages {
 
   // Default timeout for Ask patterns to other agents (even self)
   // Implicit so it can just be used where necessary
-  private implicit val TIMEOUT = Timeout(5 seconds)
+  private implicit val TIMEOUT: Timeout = Timeout(5 seconds)
   ///////////////////////
 }
 
@@ -81,7 +81,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
   // Get a reference to the helper agents. This should be updated in the
   // the agent lifecycle methods. TODO: Before using the ref maybe check if valid
-  var mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+  var mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
   var kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
 
   ///////////////////////
@@ -111,7 +111,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     log.info("Compute Agent - {} - starting", agentPath)
 
     // Get reference to helper agents
-    mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+    mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
     kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
   }
 
@@ -122,7 +122,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
     super.preRestart(reason, message)
 
     // Get reference to helper agents
-    mongoDbAgentRef = actorSelection("/user/" + MongoDbAgent.name)
+    mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
     kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
   }
 
@@ -160,7 +160,7 @@ class ComputeAgent extends Actor with ComputeAgentLogging with ComputeAgentJsonS
 
       // Store these metadata into Mongo, the message is defined in the Mongo Agent
       // ComputeJobMetaData like all MongoMessages has a default param defining the Mongo Collection
-      mongoDbAgentRef ! ComputeJobMetaData(id, name, owner, socketeer)
+      mongoMasterAgentRef ! ComputeJobMetaData(id, name, owner, socketeer)
 
       sender ! State(id, "Initiating", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
 

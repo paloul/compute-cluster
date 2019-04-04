@@ -70,7 +70,11 @@ class Settings(config: Config) extends Extension {
 
     val uri: String = config.getString("application.mongo.uri")
     val database: String = config.getString("application.mongo.database")
-    val computeAgentJobsCollection: String = config.getString("application.mongo.compute-agent-jobs.collection")
+
+    // This one is used by Mongo Master Agent, defines number of children workers to start
+    val numberMongoDbAgents: Int = config.getInt("application.mongo.num-worker-agents")
+
+    val fptComputeAgentJobsCollection: String = config.getString("application.mongo.fpt-compute-agent-jobs.collection")
 
   }
 
