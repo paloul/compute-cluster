@@ -1,9 +1,9 @@
-package ai.beyond.fpt.mvp.compute
+package ai.beyond.compute
 
-import ai.beyond.fpt.mvp.compute.agents.db.{MongoDbAgent, MongoMasterAgent}
-import ai.beyond.fpt.mvp.compute.agents.kafka.KafkaMasterAgent
-import ai.beyond.fpt.mvp.compute.rest.RestServiceSupport
-import ai.beyond.fpt.mvp.compute.sharded.ShardedAgents
+import ai.beyond.compute.agents.util.db.MongoMasterAgent
+import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
+import ai.beyond.compute.rest.RestServiceSupport
+import ai.beyond.compute.sharded.ShardedAgents
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 

@@ -1,4 +1,4 @@
-package ai.beyond.fpt.mvp.compute.serializers
+package ai.beyond.compute.serializers
 
 import akka.serialization.SerializerWithStringManifest
 import org.json4s._

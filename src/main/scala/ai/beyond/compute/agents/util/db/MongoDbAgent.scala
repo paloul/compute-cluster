@@ -1,7 +1,7 @@
-package ai.beyond.fpt.mvp.compute.agents.db
+package ai.beyond.compute.agents.util.db
 
-import ai.beyond.fpt.mvp.compute.Settings
-import ai.beyond.fpt.mvp.compute.agents.db.MongoMasterAgent.{MongoMessage, mySettings}
+import ai.beyond.compute.Settings
+import ai.beyond.compute.agents.util.db.MongoMasterAgent.{MongoMessage, mySettings}
 import akka.actor.{Actor, ActorLogging, Props}
 import org.mongodb.scala._
 
@@ -10,7 +10,7 @@ object MongoDbAgent {
     Props(new MongoDbAgent(mongoDatabase))
   }
 
-  def name: String = "fpt-mongodb-agent"
+  def name: String = "computecluster-mongodb-agent"
 
   ///////////////////////
   // Messages our MongoDbAgent can receive
@@ -19,7 +19,7 @@ object MongoDbAgent {
   // Remember in Scala, default parameters should be towards the end or else you need to define each param
   // in the call to the function/class specifically i.e. ComputeJobMetaData(id=idstr, name=namestr, etc)
   case class ComputeJobMetaData(id: String, name: String, owner: String, socketeer: String,
-              collection: String = mySettings.get.mongo.fptComputeAgentJobsCollection) extends MongoMessage
+              collection: String = mySettings.get.mongo.computeAgentJobsCollection) extends MongoMessage
 
   // To add new capability of adding data to Mongo:
   //  1. Add a new message here as a case class

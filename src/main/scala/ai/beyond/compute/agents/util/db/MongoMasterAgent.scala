@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.agents.db
+package ai.beyond.compute.agents.util.db
 
-import ai.beyond.fpt.mvp.compute.Settings
+import ai.beyond.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import org.mongodb.scala.{MongoClient, MongoDatabase}
@@ -26,7 +26,7 @@ object MongoMasterAgent {
     Props(new MongoMasterAgent)
   }
 
-  def name: String = "fpt-mongo-master-agent"
+  def name: String = "computecluster-mongo-master-agent"
 
   // Trait for all Mongo Messages, all messages below should extend this trait
   // This is so that we can more easily forward with a router all messages with base Mongo Message

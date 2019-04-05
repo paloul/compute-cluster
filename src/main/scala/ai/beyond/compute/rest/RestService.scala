@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.rest
+package ai.beyond.compute.rest
 
-import ai.beyond.fpt.mvp.compute.agents.{ComputeAgent, ComputeAgentJsonSupport}
+import ai.beyond.compute.agents.{ComputeAgent, ComputeAgentJsonSupport}
 import akka.actor.{ActorRef, ActorSystem}
 import akka.util.Timeout
 import akka.pattern.ask

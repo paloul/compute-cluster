@@ -1,8 +1,8 @@
-name := "ai.beyond.fpt.mvp.compute-agents"
+name := "ai.beyond.compute-cluster"
 
 organization := "ai.beyond"
 
-version := "0.6.0"
+version := "0.0.1"
 
 scalaVersion := "2.12.8"
 
@@ -22,7 +22,7 @@ libraryDependencies ++= {
   val json4sVersion = "3.6.4"
   val akkaVersion = "2.5.20"
   val akkaHttpVersion = "10.1.7"
-  val akkaPersistenceCassandra = "0.92"
+  val akkaPersistenceCassandra = "0.93"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -30,6 +30,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
 
     "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+    "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
 
     // https://github.com/akka/akka-persistence-cassandra
     "com.typesafe.akka" %% "akka-persistence-cassandra" % akkaPersistenceCassandra,

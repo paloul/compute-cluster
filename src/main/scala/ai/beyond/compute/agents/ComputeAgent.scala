@@ -1,7 +1,7 @@
-package ai.beyond.fpt.mvp.compute.agents
+package ai.beyond.compute.agents
 
-import ai.beyond.fpt.mvp.compute.logging.ComputeAgentLogging
-import ai.beyond.fpt.mvp.compute.sharded.ShardedMessages
+import ai.beyond.compute.logging.ComputeAgentLogging
+import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Actor, Cancellable, Props}
 import spray.json._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -12,9 +12,9 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import java.time.Instant
 
-import ai.beyond.fpt.mvp.compute.agents.db.{MongoMasterAgent}
-import ai.beyond.fpt.mvp.compute.agents.db.MongoDbAgent.ComputeJobMetaData
-import ai.beyond.fpt.mvp.compute.agents.kafka.{KafkaMasterAgent, KafkaProducerAgent}
+import ai.beyond.compute.agents.util.db.{MongoMasterAgent}
+import ai.beyond.compute.agents.util.db.MongoDbAgent.ComputeJobMetaData
+import ai.beyond.compute.agents.util.kafka.{KafkaMasterAgent, KafkaProducerAgent}
 
 // The companion object that extends the base ShardedMessages trait
 // Inherits ShardedMessages so that the 1) underlying extractId/Shard

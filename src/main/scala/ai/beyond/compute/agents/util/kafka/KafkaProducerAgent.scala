@@ -1,4 +1,4 @@
-package ai.beyond.fpt.mvp.compute.agents.kafka
+package ai.beyond.compute.agents.util.kafka
 
 import akka.actor.{Actor, ActorLogging, Props}
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
@@ -8,7 +8,7 @@ object KafkaProducerAgent {
     Props(new KafkaProducerAgent(producer))
   }
 
-  def name: String = "fpt-kafkaproducer-agent"
+  def name: String = "computecluster-kafkaproducer-agent"
 
   case class Message(topic: String, key: String, message: String)
 }

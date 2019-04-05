@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.rest
+package ai.beyond.compute.rest
 
-import ai.beyond.fpt.mvp.compute.Settings
+import ai.beyond.compute.Settings
 import akka.util.Timeout
 
 import scala.util.{Failure, Success}

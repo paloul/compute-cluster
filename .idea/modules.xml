@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ai.beyond.fpt.mvp.compute-agents.iml" filepath="$PROJECT_DIR$/.idea/modules/ai.beyond.fpt.mvp.compute-agents.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ai.beyond.fpt.mvp.compute-agents-build.iml" filepath="$PROJECT_DIR$/.idea/modules/ai.beyond.fpt.mvp.compute-agents-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ai.beyond.compute-cluster.iml" filepath="$PROJECT_DIR$/.idea/modules/ai.beyond.compute-cluster.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ai.beyond.compute-cluster-build.iml" filepath="$PROJECT_DIR$/.idea/modules/ai.beyond.compute-cluster-build.iml" />
     </modules>
   </component>
 </project>

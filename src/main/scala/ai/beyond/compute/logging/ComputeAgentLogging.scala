@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.logging
+package ai.beyond.compute.logging
 
-import ai.beyond.fpt.mvp.compute.agents.ComputeAgent
+import ai.beyond.compute.agents.ComputeAgent
 import akka.actor.ActorLogging
 //import akka.event.LoggingAdapter
 //import org.slf4j.LoggerFactory

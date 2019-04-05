@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.agents.kafka
+package ai.beyond.compute.agents.util.kafka
 
-import ai.beyond.fpt.mvp.compute.Settings
+import ai.beyond.compute.Settings
 import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import org.apache.kafka.clients.producer.KafkaProducer
@@ -22,7 +22,7 @@ object KafkaMasterAgent {
     Props(new KafkaMasterAgent)
   }
 
-  def name: String = "fpt-kafka-master-agent"
+  def name: String = "computecluster-kafka-master-agent"
 
 }
 

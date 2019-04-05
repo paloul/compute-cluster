@@ -1,4 +1,4 @@
-package ai.beyond.fpt.mvp.compute
+package ai.beyond.compute
 
 import java.util.Properties
 
@@ -61,7 +61,7 @@ class Settings(config: Config) extends Extension {
     props.put("linger.ms", lingerMilliSeconds)
     props.put("bootstrap.servers", bootstrapServers)
     props.put("max.block.ms", maxBlockMilliSeconds)
-    props.put("client.id", "ai.beyond.fpt.mvp")
+    props.put("client.id", "ai.beyond.compute-cluster")
     props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   }
@@ -74,7 +74,7 @@ class Settings(config: Config) extends Extension {
     // This one is used by Mongo Master Agent, defines number of children workers to start
     val numberMongoDbAgents: Int = config.getInt("application.mongo.num-worker-agents")
 
-    val fptComputeAgentJobsCollection: String = config.getString("application.mongo.fpt-compute-agent-jobs.collection")
+    val computeAgentJobsCollection: String = config.getString("application.mongo.compute-agent-jobs.collection")
 
   }
 

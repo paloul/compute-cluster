@@ -1,6 +1,6 @@
-package ai.beyond.fpt.mvp.compute.sharded
+package ai.beyond.compute.sharded
 
-import ai.beyond.fpt.mvp.compute.agents.ComputeAgent
+import ai.beyond.compute.agents.ComputeAgent
 import akka.actor.{Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 

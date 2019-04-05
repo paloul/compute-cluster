@@ -1,4 +1,4 @@
-package ai.beyond.fpt.mvp.compute.sharded
+package ai.beyond.compute.sharded
 
 import akka.cluster.sharding.ShardRegion
 
