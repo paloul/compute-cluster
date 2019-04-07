@@ -75,7 +75,6 @@ class Settings(config: Config) extends Extension {
     val numberMongoDbAgents: Int = config.getInt("application.mongo.num-worker-agents")
 
     val computeAgentJobsCollection: String = config.getString("application.mongo.compute-agent-jobs.collection")
-
   }
 
   // ******************************************************************************
