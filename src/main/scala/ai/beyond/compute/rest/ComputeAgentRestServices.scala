@@ -17,7 +17,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 // RestService defines all the routes and handlers for each request.
 // This class is where you would add additional functionality concerning
 // the rest API interface
-class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeout) extends ComputeAgentJsonSupport {
+class ComputeAgentRestServices(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeout) extends ComputeAgentJsonSupport {
 
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
@@ -32,10 +32,10 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
   // The routes below utilize the implicit timeout carried over from class instantiation
   //------------------------------------------------------------------------//
 
-  // API handler for api/algorithm/agent/{id}/path
+  // API handler for /v1/api/compute/job/{id}/path
   private def computeAgentPrintPath = {
     get {
-      pathPrefix("api" / "compute" / "agent" / UniqueIdString / "path") { id =>
+      pathPrefix("v1" / "api" / "compute" / "job" / UniqueIdString / "path") { id =>
         pathEndOrSingleSlash {
           agents ! ComputeAgent.PrintPath(id)
           complete(OK)
@@ -44,10 +44,10 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
     }
   }
 
-  // API handler for api/algorithm/agent/{id}/hello
+  // API handler for /v1/api/compute/job/{id}/hello
   private def computeAgentHello = {
     get {
-      pathPrefix("api" / "compute" / "agent" / UniqueIdString / "hello") { id =>
+      pathPrefix("v1" / "api" / "compute" / "job" / UniqueIdString / "hello") { id =>
         pathEndOrSingleSlash {
           agents ! ComputeAgent.HelloThere(id, "Hello, there!")
           complete(OK)

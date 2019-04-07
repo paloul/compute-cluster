@@ -34,16 +34,19 @@ trait RestServiceSupport extends RequestTimeout {
     implicit val executionContext: ExecutionContextExecutor = system.dispatcher
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-    // Create the Rest Service class and get its routes
-    // The RestService class defines the routes and how to deal with each request
-    val restApiRoutes = new RestService(agents, system).routes
+    // Create each Rest Service class and get its routes
+    // Each RestService class defines the routes and how to deal with each request, i.e. forward to agents
+    val computeRestApiRoutes = new ComputeAgentRestServices(agents, system).routes
+
+    // Combine all the routes from underlying agent rest services in to one
+    val routes = computeRestApiRoutes
 
     val host = settings.http.host // Host address to bind to
     val port = settings.http.port // Port address to bind to
 
     // Bind and create handler for HTTP requests. Returns a Future expecting ServerBinding
     // bindAndHandle uses the implicit materializer from above.
-    val bindingFuture: Future[ServerBinding] = Http().bindAndHandle(restApiRoutes, host, port)
+    val bindingFuture: Future[ServerBinding] = Http().bindAndHandle(routes, host, port)
 
     // Let the user know if HTTP binding was a success or failure.
     // If failure then terminate the whole system
