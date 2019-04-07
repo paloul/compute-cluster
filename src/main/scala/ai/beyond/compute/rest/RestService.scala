@@ -61,9 +61,17 @@ class RestService(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeo
     post {
       pathPrefix("v1" / "api" / "compute" / "job" / "initiate") {
         pathEndOrSingleSlash {
+          // Here the POST call expects a JSON body as ComputeAgent.InitiateCompute message
+          // entity(as[ComputeAgent.InitiateCompute]) will parse the provided JSON in the body
+          // as ComputeAgent.InitiateCompute as pass it as the initiate param
           entity(as[ComputeAgent.InitiateCompute]) { initiate =>
+            // TODO: Instead of creating another ComputeAgent.InitiateCompute just send
+            //  the one that was parsed from the JSON in the POST body.
             val future = agents ? ComputeAgent.InitiateCompute(
               initiate.id, initiate.name, initiate.owner, initiate.socketeer)
+
+            // Await a response from the agent that we told to the start to pass back to the
+            // caller if we had a successful initiate call
             val state = Await.result(future, timeout.duration).asInstanceOf[ComputeAgent.State]
 
             complete(state)
