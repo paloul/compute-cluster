@@ -28,6 +28,8 @@ object Main extends App with RestServiceSupport {
   // It supervises, manages and distributes work to a pool of KafkaProducerAgents.
   // This allows for the capability to alter the Supervision and restart any Producer
   //  agent that crash due to underlying kafka library or whatever reason
+  // The Kafka Master Agent is only accessible internally per cluster, no
+  // external API access
   system.actorOf(KafkaMasterAgent.props(settings), KafkaMasterAgent.name)
 
   // Start the MongoDb Agent for this actor system. Each Actor System
@@ -36,6 +38,8 @@ object Main extends App with RestServiceSupport {
   // through this actor/agent. Each MongoDb Agent is local to the Actor System.
   // The underlying Mongo Scala Driver works with a pool of connections to
   // the mongo db cluster. No need to create multiple MongoDb Agents.
+  // The Mongo Master Agent is only accessible internally per cluster, no
+  // external API access
   system.actorOf(MongoMasterAgent.props(settings), MongoMasterAgent.name)
 
   // Get the main actor type to be used for sharded cluster of actors
