@@ -10,6 +10,7 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.server.Directives._
 import akka.event.Logging
 
 // This trait is merely support to setup the Rest Services
@@ -36,10 +37,11 @@ trait RestServiceSupport extends RequestTimeout {
 
     // Create each Rest Service class and get its routes
     // Each RestService class defines the routes and how to deal with each request, i.e. forward to agents
+    val airaRestApiRoutes = new AiraSampleOneAgentRestServices(agents, system).routes
     val computeRestApiRoutes = new ComputeAgentRestServices(agents, system).routes
 
     // Combine all the routes from underlying agent rest services in to one
-    val routes = computeRestApiRoutes
+    val routes = airaRestApiRoutes ~ computeRestApiRoutes
 
     val host = settings.http.host // Host address to bind to
     val port = settings.http.port // Port address to bind to
