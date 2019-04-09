@@ -1,9 +1,7 @@
-package ai.beyond.compute.logging
+package ai.beyond.compute.logging.sample
 
-import ai.beyond.compute.agents.ComputeAgent
+import ai.beyond.compute.agents.sample.ComputeAgent
 import akka.actor.ActorLogging
-//import akka.event.LoggingAdapter
-//import org.slf4j.LoggerFactory
 
 // Extend the ActorLogging Trait with ComputeAgentLogging trait
 // to add additional loggers for Job Status and Job Results
@@ -18,7 +16,7 @@ trait ComputeAgentLogging extends ActorLogging { this: ComputeAgent ⇒
     that utilize different logback.xml loggers/appenders.
     Look below to the commented out code. You can also have access
     to the underlying default 'log' variable created by the base
-    ActorLogging trait that this one extends. 
+    ActorLogging trait that this one extends.
    */
 
   /*private var _logJobStatus: LoggingAdapter = _

@@ -4,13 +4,8 @@ import ai.beyond.compute.agents.util.db.MongoMasterAgent
 import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
 import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Actor, Props}
-import akka.util.Timeout
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import java.time.Instant
-
-import ai.beyond.compute.logging.AiraSampleOneAgentLogging
+import ai.beyond.compute.logging.aira.AiraSampleOneAgentLogging
 
 object AiraSampleOneAgent extends ShardedMessages {
 
@@ -35,9 +30,6 @@ object AiraSampleOneAgent extends ShardedMessages {
   ///////////////////////
   // Private Read-Only Parameters
 
-  // Default timeout for Ask patterns to other agents (even self)
-  // Implicit so it can just be used where necessary
-  private implicit val TIMEOUT: Timeout = Timeout(5 seconds)
   ///////////////////////
 }
 

@@ -1,22 +1,22 @@
-package ai.beyond.compute.sharded
+package ai.beyond.compute.sharded.aira
 
-import ai.beyond.compute.agents.ComputeAgent
+import ai.beyond.compute.agents.aira.AiraSampleOneAgent
+import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 
-// Companion object for ShardedComputeAgent. Overall just
+// Companion object for ShardedAiraSampleOneAgent. Overall just
 // a helper object to gain access to the underlying
 // ShardedMessages extractId and extractShard functions.
 // Along with giving algorithm agents a shard name.
-object ShardedComputeAgent extends ShardedMessages {
-  def props = Props(new ShardedComputeAgent)
+object ShardedAiraSampleOneAgent extends ShardedMessages {
+  def props = Props(new ShardedAiraSampleOneAgent)
   def name(agentId: Long): String = agentId.toString
 
-  val shardName: String = "compute-agents"
+  val shardName: String = "aira-sample-one-agents"
 }
 
-
-class ShardedComputeAgent extends ComputeAgent {
+class ShardedAiraSampleOneAgent extends AiraSampleOneAgent {
 
   // Capture when an instance was created, val because it shouldn't change
   val objCreationTime = System.nanoTime()
@@ -35,10 +35,10 @@ class ShardedComputeAgent extends ComputeAgent {
       // to the child, therefore putting a stop to all outgoing messages intended for the child
       // before sending it the official stop message.
       log.info("Received Timeout message, initiating Passivate for self [{}]", self.path.toString)
-      context.parent ! Passivate(stopMessage = ComputeAgent.Stop)
+      context.parent ! Passivate(stopMessage = AiraSampleOneAgent.Stop)
 
     // A Stop message was received so we stop ourselves
-    case ComputeAgent.Stop => context.stop(self)
+    case AiraSampleOneAgent.Stop => context.stop(self)
 
     // Catch the unhandled message, as Scala Match throws an error scala.MatchError, if we don't catch them
     case _ => log.warning("Received unknown message that was unhandled, ignoring")

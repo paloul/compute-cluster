@@ -1,12 +1,13 @@
-package ai.beyond.compute.serializers
+package ai.beyond.compute.serializers.aira
 
 import akka.serialization.SerializerWithStringManifest
 import org.json4s._
 import org.json4s.native.Serialization
 import org.json4s.native.Serialization.{read, write}
 
-class ComputeAgentSerializer extends SerializerWithStringManifest {
-  def identifier:Int = 9991
+class AiraSampleOneAgentSerializer extends SerializerWithStringManifest {
+
+  def identifier:Int = 9992 // This should be unique for each Serializer
 
   implicit val formats = Serialization.formats(NoTypeHints)
 

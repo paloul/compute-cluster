@@ -1,9 +1,7 @@
-package ai.beyond.compute.logging
+package ai.beyond.compute.logging.aira
 
 import ai.beyond.compute.agents.aira.AiraSampleOneAgent
 import akka.actor.ActorLogging
-//import akka.event.LoggingAdapter
-//import org.slf4j.LoggerFactory
 
 // Extend the ActorLogging Trait with AiraSampleOneAgentLogging trait
 // to add additional loggers for Job Status and Job Results
@@ -18,7 +16,7 @@ trait AiraSampleOneAgentLogging extends ActorLogging { this: AiraSampleOneAgent 
     that utilize different logback.xml loggers/appenders.
     Look below to the commented out code. You can also have access
     to the underlying default 'log' variable created by the base
-    ActorLogging trait that this one extends. 
+    ActorLogging trait that this one extends.
    */
 
   /*private var _logJobStatus: LoggingAdapter = _
@@ -31,6 +29,5 @@ trait AiraSampleOneAgentLogging extends ActorLogging { this: AiraSampleOneAgent 
 
     _logJobStatus
   }*/
-
 
 }

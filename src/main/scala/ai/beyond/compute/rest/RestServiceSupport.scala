@@ -1,6 +1,8 @@
 package ai.beyond.compute.rest
 
 import ai.beyond.compute.Settings
+import ai.beyond.compute.rest.aira.AiraSampleOneAgentRestServices
+import ai.beyond.compute.rest.sample.ComputeAgentRestServices
 import akka.util.Timeout
 
 import scala.util.{Failure, Success}
@@ -39,9 +41,10 @@ trait RestServiceSupport extends RequestTimeout {
     // Each RestService class defines the routes and how to deal with each request, i.e. forward to agents
     val airaRestApiRoutes = new AiraSampleOneAgentRestServices(agents, system).routes
     val computeRestApiRoutes = new ComputeAgentRestServices(agents, system).routes
+    /* INSTANTIATE ADDITIONAL REST API ROUTES HERE AFTER CREATION OF NEW SUPPORT CLASS */
 
     // Combine all the routes from underlying agent rest services in to one
-    val routes = airaRestApiRoutes ~ computeRestApiRoutes
+    val routes = airaRestApiRoutes ~ computeRestApiRoutes /* APPEND ANY NEW ROUTES HERE WITH THE ~ SYMBOL */
 
     val host = settings.http.host // Host address to bind to
     val port = settings.http.port // Port address to bind to

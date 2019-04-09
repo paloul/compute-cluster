@@ -1,21 +1,23 @@
-package ai.beyond.compute.sharded
+package ai.beyond.compute.sharded.sample
 
-import ai.beyond.compute.agents.aira.AiraSampleOneAgent
+import ai.beyond.compute.agents.sample.ComputeAgent
+import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 
-// Companion object for ShardedAiraSampleOneAgent. Overall just
+// Companion object for ShardedComputeAgent. Overall just
 // a helper object to gain access to the underlying
 // ShardedMessages extractId and extractShard functions.
 // Along with giving algorithm agents a shard name.
-object ShardedAiraSampleOneAgent extends ShardedMessages {
-  def props = Props(new ShardedAiraSampleOneAgent)
+object ShardedComputeAgent extends ShardedMessages {
+  def props = Props(new ShardedComputeAgent)
   def name(agentId: Long): String = agentId.toString
 
-  val shardName: String = "aira-sample-one-agents"
+  val shardName: String = "sample-compute-agents"
 }
 
-class ShardedAiraSampleOneAgent extends AiraSampleOneAgent {
+
+class ShardedComputeAgent extends ComputeAgent {
 
   // Capture when an instance was created, val because it shouldn't change
   val objCreationTime = System.nanoTime()
@@ -34,10 +36,10 @@ class ShardedAiraSampleOneAgent extends AiraSampleOneAgent {
       // to the child, therefore putting a stop to all outgoing messages intended for the child
       // before sending it the official stop message.
       log.info("Received Timeout message, initiating Passivate for self [{}]", self.path.toString)
-      context.parent ! Passivate(stopMessage = AiraSampleOneAgent.Stop)
+      context.parent ! Passivate(stopMessage = ComputeAgent.Stop)
 
     // A Stop message was received so we stop ourselves
-    case AiraSampleOneAgent.Stop => context.stop(self)
+    case ComputeAgent.Stop => context.stop(self)
 
     // Catch the unhandled message, as Scala Match throws an error scala.MatchError, if we don't catch them
     case _ => log.warning("Received unknown message that was unhandled, ignoring")

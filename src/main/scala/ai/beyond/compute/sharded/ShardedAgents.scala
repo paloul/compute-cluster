@@ -1,13 +1,15 @@
 package ai.beyond.compute.sharded
 
-import ai.beyond.compute.agents.ComputeAgent
 import ai.beyond.compute.agents.aira.AiraSampleOneAgent
+import ai.beyond.compute.agents.sample.ComputeAgent
+import ai.beyond.compute.sharded.aira.ShardedAiraSampleOneAgent
+import ai.beyond.compute.sharded.sample.ShardedComputeAgent
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 
 object ShardedAgents {
   def props = Props(new ShardedAgents)
-  def name: String = "fpt-sharded-agents"
+  def name: String = "compute-cluster-sharded-agents"
 }
 
 class ShardedAgents extends Actor with ActorLogging {

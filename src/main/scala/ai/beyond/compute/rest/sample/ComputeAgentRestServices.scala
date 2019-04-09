@@ -1,18 +1,16 @@
-package ai.beyond.compute.rest
+package ai.beyond.compute.rest.sample
 
-import ai.beyond.compute.agents.{ComputeAgent, ComputeAgentJsonSupport}
+import ai.beyond.compute.agents.sample.{ComputeAgent, ComputeAgentJsonSupport}
 import akka.actor.{ActorRef, ActorSystem}
-import akka.util.Timeout
-import akka.pattern.ask
-
-import scala.concurrent.Future
-import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server.Directives._
+import akka.pattern.ask
+import akka.util.Timeout
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.util.Try
 
 // RestService defines all the routes and handlers for each request.
 // This class is where you would add additional functionality concerning
