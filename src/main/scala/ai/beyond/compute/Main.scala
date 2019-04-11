@@ -46,5 +46,5 @@ object Main extends App with RestServiceSupport {
   // ShardedAgents deals with identifying incoming requests and routing them
   // correctly to the right agent type.
   // Start the Rest Service hosted by RestServiceSupport
-  startRestService(system.actorOf(ShardedAgents.props, ShardedAgents.name), settings)
+  startRestService(system.actorOf(ShardedAgents.props(settings), ShardedAgents.name), settings)
 }

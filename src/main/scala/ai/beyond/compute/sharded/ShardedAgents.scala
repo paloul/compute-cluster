@@ -1,5 +1,6 @@
 package ai.beyond.compute.sharded
 
+import ai.beyond.compute.Settings
 import ai.beyond.compute.agents.aira.AiraSampleOneAgent
 import ai.beyond.compute.agents.aira.geo.GeoDynamicAgent
 import ai.beyond.compute.agents.sample.ComputeAgent
@@ -10,7 +11,15 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 
 object ShardedAgents {
-  def props = Props(new ShardedAgents)
+  var mySettings: Option[Settings] = None
+
+  def props(settings: Settings) = {
+
+    mySettings = Some(settings)
+
+    Props(new ShardedAgents)
+  }
+
   def name: String = "compute-cluster-sharded-agents"
 }
 

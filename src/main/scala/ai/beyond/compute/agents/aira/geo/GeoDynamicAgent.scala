@@ -116,6 +116,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
+      processSpark(id)
 
     case Start(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath) =>
       log.info("Starting compute with job ID[{}]", id)
@@ -164,8 +165,11 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
-  def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
-                   trajPath: String, geoMeanPath: String): Unit = {
+  def processSpark(id: String): Unit = {
+
+
+    val df = spark.read.csv("hdfs://localhost:8020/geo-dynamic-files/BL_summary.csv")
+    log.info(df.show(5, true).toString)
 
 
 
