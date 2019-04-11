@@ -4,6 +4,7 @@ import ai.beyond.compute.agents.util.db.MongoMasterAgent
 import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
 import ai.beyond.compute.logging.aira.AiraAgentLogging
 import akka.actor.{Actor, ActorSelection}
+import org.apache.spark.sql.SparkSession
 
 // TODO: Add anything else common between all Aira agents
 
@@ -20,31 +21,34 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   var mongoMasterAgentRef: ActorSelection = actorSelection("/user/" + MongoMasterAgent.name)
   var kafkaMasterAgentRef: ActorSelection = actorSelection("/user/" + KafkaMasterAgent.name)
 
+  // Stores a reference to the Spark session
+  var spark: SparkSession = _
+
 
   //------------------------------------------------------------------------//
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    log.info("GeoDynamic Agent - {} - starting", agentPath)
+    super.preStart()
 
     // Get reference to helper agents
     mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
     kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
+
+    // Start the Spark session
+    spark = SparkSession.builder()
+        .master("local[*]")
+        .appName(agentName)
+        .getOrCreate()
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    // Debugging information if agent is restarted
-    log.error(reason, "GeoDynamic Agent restarting due to [{}] when processing [{}]",
-      reason.getMessage, message.getOrElse(""))
     super.preRestart(reason, message)
-
-    // Get reference to helper agents
-    mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
-    kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
   }
 
   override def postStop(): Unit = {
-    log.info("GeoDynamic Agent - {} - stopped", agentPath)
+    super.postStop()
+    spark.close()
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle

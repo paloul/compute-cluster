@@ -78,6 +78,31 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
 
   //------------------------------------------------------------------------//
+  // Actor lifecycle
+  //------------------------------------------------------------------------//
+  override def preStart(): Unit = {
+    super.preStart()
+    log.info("GeoDynamic Agent - {} - starting", agentPath)
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    super.preRestart(reason, message)
+
+    // Debugging information if agent is restarted
+    log.error(reason, "GeoDynamic Agent restarting due to [{}] when processing [{}]",
+      reason.getMessage, message.getOrElse(""))
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    log.info("GeoDynamic Agent - {} - stopped", agentPath)
+  }
+  //------------------------------------------------------------------------//
+  // End Actor Lifecycle
+  //------------------------------------------------------------------------//
+
+
+  //------------------------------------------------------------------------//
   // Begin Actor Receive Behavior
   //------------------------------------------------------------------------//
   override def receive: Receive = idle // Set the initial behavior to idle

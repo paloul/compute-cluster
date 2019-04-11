@@ -23,6 +23,7 @@ libraryDependencies ++= {
   val akkaVersion = "2.5.20"
   val akkaHttpVersion = "10.1.7"
   val akkaPersistenceCassandra = "0.93"
+  val sparkVersion = "2.4.0"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -52,7 +53,12 @@ libraryDependencies ++= {
 
     "org.apache.kafka" % "kafka-clients" % "2.1.1",
 
-    "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0"
+    "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0",
+    
+    // spark
+    "org.apache.spark" %% "spark-core" % sparkVersion,
+    "org.apache.spark" %% "spark-sql" % sparkVersion,
+    "org.apache.spark" %% "spark-mllib" % sparkVersion
   )
 }
 
