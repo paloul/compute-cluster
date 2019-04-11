@@ -38,7 +38,7 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
     // Start the Spark session
     spark = SparkSession.builder()
         .master("local[*]")
-        .appName(agentName)
+        .appName("AIRA Agent ["+agentName+"]")
         .getOrCreate()
   }
 
