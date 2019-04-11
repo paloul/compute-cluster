@@ -49,6 +49,17 @@
     <!-- Turn down mongo noise -->
     <logger name="org.mongodb.driver" level="WARN" />
 
+    <!-- Turn down spark noise -->
+    <logger name="org.apache.spark" level="WARN" />
+    <!-- Turn down org.spark_project -->
+    <logger name="org.spark_project" level="WARN" />
+
+    <!-- Turn down hadoop noise -->
+    <logger name="org.apache.hadoop" level="WARN" />
+
+    <!-- Turn down nio -->
+    <logger name="io.netty" level="WARN" />
+
     <root name="root" level="DEBUG" additivity="TRUE">
         <appender-ref ref="ROLLING_FILE" />
         <appender-ref ref="STDOUT" />

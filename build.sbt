@@ -51,14 +51,18 @@ libraryDependencies ++= {
     "org.json4s" %% "json4s-native" % json4sVersion,
     "org.json4s" %% "json4s-ext" % json4sVersion,
 
+    // Kafka client
     "org.apache.kafka" % "kafka-clients" % "2.1.1",
 
+    // Mongo client
     "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0",
     
-    // spark
+    // Spark
     "org.apache.spark" %% "spark-core" % sparkVersion,
     "org.apache.spark" %% "spark-sql" % sparkVersion,
-    "org.apache.spark" %% "spark-mllib" % sparkVersion
+    "org.apache.spark" %% "spark-mllib" % sparkVersion,
+    // Spark dependencies
+    "org.scala-lang.modules" %% "scala-xml" % "1.1.1"
   )
 }
 
