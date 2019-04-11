@@ -3,8 +3,6 @@ package ai.beyond.compute.agents.aira.geo
 import java.time.Instant
 
 import ai.beyond.compute.agents.aira.AiraAgent
-import ai.beyond.compute.agents.util.db.MongoMasterAgent
-import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
 import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Cancellable, Props}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
@@ -166,6 +164,13 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
+  def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
+                   trajPath: String, geoMeanPath: String): Unit = {
+
+
+
+  }
+
   def runCompute(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
                      trajPath: String, geoMeanPath: String): Unit = {
     // TODO: Load the files and do stuff
