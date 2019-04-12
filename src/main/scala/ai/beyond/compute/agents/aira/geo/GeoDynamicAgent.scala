@@ -3,7 +3,7 @@ package ai.beyond.compute.agents.aira.geo
 import java.time.Instant
 
 import ai.beyond.compute.agents.aira.AiraAgent
-import ai.beyond.compute.sharded.ShardedMessages
+import ai.beyond.compute.sharded.{ShardedAgents, ShardedMessages}
 import akka.actor.{Cancellable, Props}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.pattern.ask
@@ -12,6 +12,7 @@ import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import org.apache.spark.sql.Encoders
 
 object GeoDynamicAgent extends ShardedMessages {
   def props(agentId: String) = Props(new GeoDynamicAgent)
@@ -42,11 +43,44 @@ object GeoDynamicAgent extends ShardedMessages {
 
   ///////////////////////
   // Private Read-Only Parameters
+  ///////////////////////
 
   // Default timeout for Ask patterns to other agents (even self)
   // Implicit so it can just be used where necessary
   private implicit val TIMEOUT: Timeout = Timeout(5 seconds)
 
+  ///////////////////////
+
+  ///////////////////////
+  // CSV Schema Specifications
+  ///////////////////////
+  //,Well identifier,Comp Name,Oil (BOPD),Gas (MCFD),Water (BWPD)
+  case class ProdSchema(date: String, wellId: String, compName: String, oil: Float, gas: Float, water: Float)
+  private val PROD_SCHEMA = Encoders.product[ProdSchema].schema
+
+  //,X,Y,Z
+  case class OwcSchema(ind: Int, x: Float, y: Float, z: Float)
+  private val OWC_SCHEMA = Encoders.product[OwcSchema].schema
+
+  //,2015,2016,2017,Confidence,CoefY,CoefX,Intercept,Xmin,Xmax,Ymin,Ymax,Sealing
+  case class FaultSchema(ind: Int, y15: Int, y16: Int, y17: Int, confidence: Float, coefY: Float, coefX: Float,
+                         intercept: Float, xMin: Float, xMax: Float, yMin: Float, yMax: Float, sealing: Int)
+  private val FAULT_SCHEMA = Encoders.product[FaultSchema].schema
+
+  //,WellName,StartPerf,EndPerf
+  case class PerfSchema(ind: Int, wellName: String, startPerf: Int, endPerf: Int)
+  private val PERF_SCHEMA = Encoders.product[PerfSchema].schema
+
+  //Index,Well identifier,MD,X,Y,Z,TVD,DX,DY,AZIM,INCL,DLS
+  case class TrajSchema(ind: Int, wellId: String, md: Float, x: Float, y: Float, z: Float, tvd: Float,
+                        dx: Float, dy: Float, azim: Float, incl: Float, dls: Float)
+  private val TRAJ_SCHEMA = Encoders.product[TrajSchema].schema
+
+  //X,Y,Z,GR_mean,GR_std,NPSS_mean,NPSS_std,RHOB_mean,RHOB_std,Predicted Cluster,SWT_mean,SWT_std,PHIT_mean,PHIT_std,KOILT_mean,KOILT_std
+  case class GeoMeanSchema(x: Float, y: Float, z: Float, grMean: Float, grStd: Float, npssMean: Float,
+                           npssStd: Float, rhobMean: Float, rhobStd: Float, cluster: Float, swtMean: Float,
+                           swtStd: Float, phitMean: Float, phitStd: Float, koiltMean: Float, koildStd: Float)
+  private val GEO_MEAN_SCHEMA = Encoders.product[GeoMeanSchema].schema
   ///////////////////////
 }
 
@@ -63,6 +97,11 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   import context._
   // Import the companion object above to use the messages defined for us
   import GeoDynamicAgent._
+  // Import implicits specific to spark session
+  import spark.implicits._
+
+  // Constants
+  val HDFS_BASE: String = ShardedAgents.mySettings.get.spark.hdfsBase
 
   // Meta property object to store any meta data
   object META_PROPS {
@@ -116,12 +155,11 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
-      processSpark(id)
 
     case Start(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath) =>
       log.info("Starting compute with job ID[{}]", id)
       sender ! State(id, "Starting", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
-      runCompute(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath)
+      processSpark(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath)
       become(computing)
   }
 
@@ -165,22 +203,80 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
-  def processSpark(id: String): Unit = {
-
-
-    val df = spark.read.csv("hdfs://localhost:8020/geo-dynamic-files/BL_summary.csv")
-    log.info(df.show(5, true).toString)
-
-
-
-  }
-
-  def runCompute(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
-                     trajPath: String, geoMeanPath: String): Unit = {
-    // TODO: Load the files and do stuff
+  def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
+                   trajPath: String, geoMeanPath: String): Unit = {
     log.info("File paths (1/2): {}, {}, {}", prodPath, owcPath, faultPath)
     log.info("File paths (2/2): {}, {}, {}", perfPath, trajPath, geoMeanPath)
 
+    // Load the production dataset
+    var prodDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(PROD_SCHEMA)
+      .load(HDFS_BASE + prodPath)
+      .as[ProdSchema]
+
+    prodDs.printSchema()
+    prodDs.show(2)
+
+    // Load the OWCs dataset
+    var owcDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(OWC_SCHEMA)
+      .load(HDFS_BASE + owcPath)
+      .as[OwcSchema]
+
+    owcDs.printSchema()
+    owcDs.show(2)
+
+    // Load the faults dataset
+    var faultDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(FAULT_SCHEMA)
+      .load(HDFS_BASE + faultPath)
+      .as[FaultSchema]
+
+    faultDs.printSchema()
+    faultDs.show(2)
+
+    // Load the perforations dataset
+    var perfDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(PERF_SCHEMA)
+      .load(HDFS_BASE + perfPath)
+      .as[PerfSchema]
+
+    perfDs.printSchema()
+    perfDs.show(2)
+
+    // Load the trajectory dataset
+    var trajDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(TRAJ_SCHEMA)
+      .load(HDFS_BASE + trajPath)
+      .as[TrajSchema]
+
+    trajDs.printSchema()
+    trajDs.show(2)
+
+    // Load the OWCs dataset
+    var geoMeanDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(GEO_MEAN_SCHEMA)
+      .load(HDFS_BASE + geoMeanPath)
+      .as[GeoMeanSchema]
+
+    geoMeanDs.printSchema()
+    geoMeanDs.show(2)
+
+  }
+
+  def runCompute(id: String): Unit = {
     /////////////////////////////////////////////////////////////////////////
     // FIXME: GKP - 2019-02-27
     //  This block just mimics potential compute being done

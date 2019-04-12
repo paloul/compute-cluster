@@ -22,7 +22,11 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   var kafkaMasterAgentRef: ActorSelection = actorSelection("/user/" + KafkaMasterAgent.name)
 
   // Stores a reference to the Spark session
-  var spark: SparkSession = _
+  // Note: This needs to be a val so implicits can be imported
+  val spark: SparkSession = SparkSession.builder()
+      .master("local[*]")
+      .appName("AIRA Agent ["+agentName+"]")
+      .getOrCreate()
 
 
   //------------------------------------------------------------------------//
@@ -34,12 +38,6 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
     // Get reference to helper agents
     mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
     kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
-
-    // Start the Spark session
-    spark = SparkSession.builder()
-        .master("local[*]")
-        .appName("AIRA Agent ["+agentName+"]")
-        .getOrCreate()
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
