@@ -72,7 +72,8 @@ class AiraAgentRestServices(agents: ActorRef, system: ActorSystem)(implicit time
             // TODO: Instead of creating another GeoDynamicAgent.Start, just send
             //  the one that was parsed from the JSON in the POST body.
             val future = agents ? GeoDynamicAgent.Start(body.id, body.prodPath, body.owcPath,
-              body.faultPath, body.perfPath, body.trajPath, body.geoMeanPath)
+              body.faultPath, body.perfPath, body.trajPath, body.geoMeanPath, body.atlMatPath,
+              body.atlGridPath, body.dfResPath)
 
             // Await a response from the agent that we told to the start to pass back to the
             // caller if we had a successful initiate call

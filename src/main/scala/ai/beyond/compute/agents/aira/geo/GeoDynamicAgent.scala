@@ -32,7 +32,8 @@ object GeoDynamicAgent extends ShardedMessages {
 
   // Tell-based messages
   case class Start(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
-                   trajPath: String, geoMeanPath: String) extends Message
+                   trajPath: String, geoMeanPath: String, atlMatPath: String, atlGridPath: String,
+                   dfResPath: String) extends Message
   case class CancelJob(id: String) extends Message
   case class CompleteJob(id: String) extends Message
 
@@ -54,6 +55,7 @@ object GeoDynamicAgent extends ShardedMessages {
   ///////////////////////
   // CSV Schema Specifications
   ///////////////////////
+
   //,Well identifier,Comp Name,Oil (BOPD),Gas (MCFD),Water (BWPD)
   case class ProdSchema(date: String, wellId: String, compName: String, oil: Float, gas: Float, water: Float)
   private val PROD_SCHEMA = Encoders.product[ProdSchema].schema
@@ -81,6 +83,22 @@ object GeoDynamicAgent extends ShardedMessages {
                            npssStd: Float, rhobMean: Float, rhobStd: Float, cluster: Float, swtMean: Float,
                            swtStd: Float, phitMean: Float, phitStd: Float, koiltMean: Float, koildStd: Float)
   private val GEO_MEAN_SCHEMA = Encoders.product[GeoMeanSchema].schema
+
+  //type,nx,ny,nz
+  case class AtlMatSchema(rtype: Int, nx: Int, ny: Int, nz: Int)
+  private val ATL_MAT_SCHEMA = Encoders.product[AtlMatSchema].schema
+
+  //nx,ny,nz,X,Y,Z
+  case class AtlGridSchema(nx: Int, ny: Int, nz: Int, x: Float, y: Float, z: Float)
+  private val ATL_GRID_SCHEMA = Encoders.product[AtlGridSchema].schema
+
+  // TODO: The schema for this is the exact same as ATL_GRID! The difference between the two
+  //  is that ATL_GRID has X/Y/Z values for all cells in the VOI, while df_res has the X/Y/Z
+  //  values for only cells within the reservoir. Could they be merged, or one ignored?
+  //,nx,ny,nz,X,Y,Z
+  case class DfResSchema(ind: Int, nx: Int, ny: Int, nz: Int, x: Float, y: Float, z: Float)
+  private val DF_RES_SCHEMA = Encoders.product[AtlGridSchema].schema
+
   ///////////////////////
 }
 
@@ -88,7 +106,7 @@ object GeoDynamicAgent extends ShardedMessages {
 // Helps marshall the messages between JSON received via HTTP APIs
 trait GeoDynamicAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   // Add any messages that you need to be marshalled back and forth from/to json
-  implicit val itemFormat = jsonFormat7(GeoDynamicAgent.Start)
+  implicit val itemFormat = jsonFormat10(GeoDynamicAgent.Start)
   implicit val stateFormat = jsonFormat4(GeoDynamicAgent.State)
 }
 
@@ -156,10 +174,11 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
 
-    case Start(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath) =>
+    case Start(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath, atlMatPath, atlGridPath, dfResPath) =>
       log.info("Starting compute with job ID[{}]", id)
       sender ! State(id, "Starting", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
-      processSpark(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath)
+      processSpark(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath, atlMatPath,
+        atlGridPath, dfResPath)
       become(computing)
   }
 
@@ -204,9 +223,11 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   // Begin Compute Functions
   //------------------------------------------------------------------------//
   def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
-                   trajPath: String, geoMeanPath: String): Unit = {
-    log.info("File paths (1/2): {}, {}, {}", prodPath, owcPath, faultPath)
-    log.info("File paths (2/2): {}, {}, {}", perfPath, trajPath, geoMeanPath)
+                   trajPath: String, geoMeanPath: String, atlMathPath: String, atlGridPath: String,
+                   dfResPath: String): Unit = {
+    log.info("File paths (1/3): {}, {}, {}", prodPath, owcPath, faultPath)
+    log.info("File paths (2/3): {}, {}, {}", perfPath, trajPath, geoMeanPath)
+    log.info("File paths (3/3): {}, {}, {}", atlMathPath, atlGridPath, dfResPath)
 
     // Load the production dataset
     var prodDs = spark.read
@@ -263,7 +284,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     trajDs.printSchema()
     trajDs.show(2)
 
-    // Load the OWCs dataset
+    // Load the geo mean dataset
     var geoMeanDs = spark.read
       .format("csv")
       .option("header", "true")
@@ -274,6 +295,38 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     geoMeanDs.printSchema()
     geoMeanDs.show(2)
 
+    // Load the ATL_MAT dataset
+    var atlMatDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(ATL_MAT_SCHEMA)
+      .load(HDFS_BASE + atlMathPath)
+      .as[AtlMatSchema]
+
+    atlMatDs.printSchema()
+    atlMatDs.show(2)
+
+    // Load the ATL_GRID dataset
+    var atlGridDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(ATL_GRID_SCHEMA)
+      .load(HDFS_BASE + atlGridPath)
+      .as[AtlGridSchema]
+
+    atlGridDs.printSchema()
+    atlGridDs.show(2)
+
+    // Load the df_res dataset
+    var dfResDs = spark.read
+      .format("csv")
+      .option("header", "true")
+      .schema(DF_RES_SCHEMA)
+      .load(HDFS_BASE + dfResPath)
+      .as[DfResSchema]
+
+    dfResDs.printSchema()
+    dfResDs.show(2)
   }
 
   def runCompute(id: String): Unit = {
