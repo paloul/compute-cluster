@@ -96,8 +96,8 @@ object GeoDynamicAgent extends ShardedMessages {
   //  is that ATL_GRID has X/Y/Z values for all cells in the VOI, while df_res has the X/Y/Z
   //  values for only cells within the reservoir. Could they be merged, or one ignored?
   //,nx,ny,nz,X,Y,Z
-  case class DfResSchema(ind: Int, nx: Int, ny: Int, nz: Int, x: Float, y: Float, z: Float)
-  private val DF_RES_SCHEMA = Encoders.product[AtlGridSchema].schema
+  case class DfResSchema(ind: Int, nx: Float, ny: Float, nz: Float, x: Float, y: Float, z: Float)
+  private val DF_RES_SCHEMA = Encoders.product[DfResSchema].schema
 
   ///////////////////////
 }
