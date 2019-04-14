@@ -3,9 +3,11 @@ package ai.beyond.compute.logging.aira
 import ai.beyond.compute.agents.aira.AiraAgent
 import akka.actor.ActorLogging
 
-// Extend the ActorLogging Trait with AiraAgentLogging trait
-// to add additional loggers for Job Status and Job Results
-// Restricted only to classes extending the AiraAgent abstract class
+/**
+  * Extend the ActorLogging Trait with AiraAgentLogging trait
+  * to add additional loggers for Job Status and Job Results
+  * Restricted only to classes extending the AiraAgent abstract class
+  */
 trait AiraAgentLogging extends ActorLogging { this: AiraAgent ⇒
 
 
@@ -29,5 +31,22 @@ trait AiraAgentLogging extends ActorLogging { this: AiraAgent ⇒
 
     _logJobStatus
   }*/
+
+  /**
+    * Will measure time elapsed of the func block passed
+    * @param name Name of func block for log output
+    * @param block Execution block
+    * @tparam R
+    * @return
+    */
+  def time[R](name:String, block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name, will execute func block
+    val t1 = System.nanoTime()
+
+    log.info("[{}] Elapsed time: {} ns", name, (t1 - t0))
+
+    result // return the result from func block
+  }
 
 }
