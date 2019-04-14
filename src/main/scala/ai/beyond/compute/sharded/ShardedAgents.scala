@@ -1,10 +1,8 @@
 package ai.beyond.compute.sharded
 
 import ai.beyond.compute.Settings
-import ai.beyond.compute.agents.aira.AiraSampleOneAgent
 import ai.beyond.compute.agents.aira.geo.GeoDynamicAgent
 import ai.beyond.compute.agents.sample.ComputeAgent
-import ai.beyond.compute.sharded.aira.ShardedAiraSampleOneAgent
 import ai.beyond.compute.sharded.aira.geo.ShardedGeoDynamicAgent
 import ai.beyond.compute.sharded.sample.ShardedComputeAgent
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
@@ -34,15 +32,6 @@ class ShardedAgents extends Actor with ActorLogging {
     ShardedComputeAgent.extractShardId
   )
 
-  // Start the cluster shard system and manager for the Sample Aira agents
-  val shardedAiraSampleOneAgents: ActorRef = ClusterSharding(context.system).start(
-    ShardedAiraSampleOneAgent.shardName,
-    ShardedAiraSampleOneAgent.props,
-    ClusterShardingSettings(context.system),
-    ShardedAiraSampleOneAgent.extractEntityId,
-    ShardedAiraSampleOneAgent.extractShardId
-  )
-
   // Start the cluster shard system and manager for the GeoDynamic agents
   val shardedGeoDynamicAgents: ActorRef = ClusterSharding(context.system).start(
     ShardedGeoDynamicAgent.shardName,
@@ -60,9 +49,6 @@ class ShardedAgents extends Actor with ActorLogging {
 
     case computeMessage: ComputeAgent.Message =>
       shardedComputeAgents forward computeMessage
-
-    case airaSampleOneMessage: AiraSampleOneAgent.Message =>
-      shardedAiraSampleOneAgents forward airaSampleOneMessage
 
     case geoDynamicMessage: GeoDynamicAgent.Message =>
       shardedGeoDynamicAgents forward geoDynamicMessage
