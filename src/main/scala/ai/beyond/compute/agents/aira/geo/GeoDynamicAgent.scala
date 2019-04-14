@@ -222,6 +222,22 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   //------------------------------------------------------------------------//
   // Begin Compute Functions
   //------------------------------------------------------------------------//
+  /**
+    * Starts processing data with spark, initial read of data files provided as params
+    *
+    * 2019-04-13: Utilizing HDFS to store data and prepend provided data files with HDFS base
+    * TODO: Potentiall to offer more flexibility take in full paths to files instead of forcing HDFS
+    * @param id
+    * @param prodPath
+    * @param owcPath
+    * @param faultPath
+    * @param perfPath
+    * @param trajPath
+    * @param geoMeanPath
+    * @param atlMathPath
+    * @param atlGridPath
+    * @param dfResPath
+    */
   def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
                    trajPath: String, geoMeanPath: String, atlMathPath: String, atlGridPath: String,
                    dfResPath: String): Unit = {
@@ -230,100 +246,136 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     log.info("File paths (3/3): {}, {}, {}", atlMathPath, atlGridPath, dfResPath)
 
     // Load the production dataset
-    var prodDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(PROD_SCHEMA)
-      .load(HDFS_BASE + prodPath)
-      .as[ProdSchema]
+    val prodDs = time (
+      "Reading Production Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(PROD_SCHEMA)
+          .load(HDFS_BASE + prodPath)
+          .as[ProdSchema]
+      }
+    )
 
     prodDs.printSchema()
     prodDs.show(2)
 
     // Load the OWCs dataset
-    var owcDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(OWC_SCHEMA)
-      .load(HDFS_BASE + owcPath)
-      .as[OwcSchema]
+    val owcDs = time (
+      "Reading OWCs Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(OWC_SCHEMA)
+          .load(HDFS_BASE + owcPath)
+          .as[OwcSchema]
+      }
+    )
 
     owcDs.printSchema()
     owcDs.show(2)
 
     // Load the faults dataset
-    var faultDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(FAULT_SCHEMA)
-      .load(HDFS_BASE + faultPath)
-      .as[FaultSchema]
+    val faultDs = time (
+      "Reading the Faults Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(FAULT_SCHEMA)
+          .load(HDFS_BASE + faultPath)
+          .as[FaultSchema]
+      }
+    )
 
     faultDs.printSchema()
     faultDs.show(2)
 
     // Load the perforations dataset
-    var perfDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(PERF_SCHEMA)
-      .load(HDFS_BASE + perfPath)
-      .as[PerfSchema]
+    val perfDs = time (
+      "Reading the Perforations Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(PERF_SCHEMA)
+          .load(HDFS_BASE + perfPath)
+          .as[PerfSchema]
+      }
+    )
 
     perfDs.printSchema()
     perfDs.show(2)
 
     // Load the trajectory dataset
-    var trajDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(TRAJ_SCHEMA)
-      .load(HDFS_BASE + trajPath)
-      .as[TrajSchema]
+    val trajDs = time (
+      "Reading the Trajectory Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(TRAJ_SCHEMA)
+          .load(HDFS_BASE + trajPath)
+          .as[TrajSchema]
+      }
+    )
 
     trajDs.printSchema()
     trajDs.show(2)
 
     // Load the geo mean dataset
-    var geoMeanDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(GEO_MEAN_SCHEMA)
-      .load(HDFS_BASE + geoMeanPath)
-      .as[GeoMeanSchema]
+    val geoMeanDs = time (
+      "Reading the Geo Mean Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(GEO_MEAN_SCHEMA)
+          .load(HDFS_BASE + geoMeanPath)
+          .as[GeoMeanSchema]
+      }
+    )
 
     geoMeanDs.printSchema()
     geoMeanDs.show(2)
 
     // Load the ATL_MAT dataset
-    var atlMatDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(ATL_MAT_SCHEMA)
-      .load(HDFS_BASE + atlMathPath)
-      .as[AtlMatSchema]
+    val atlMatDs = time (
+      "Reading the ATL_MAT Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(ATL_MAT_SCHEMA)
+          .load(HDFS_BASE + atlMathPath)
+          .as[AtlMatSchema]
+      }
+    )
 
     atlMatDs.printSchema()
     atlMatDs.show(2)
 
     // Load the ATL_GRID dataset
-    var atlGridDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(ATL_GRID_SCHEMA)
-      .load(HDFS_BASE + atlGridPath)
-      .as[AtlGridSchema]
+    val atlGridDs = time (
+      "Reading the ATL_GRID Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(ATL_GRID_SCHEMA)
+          .load(HDFS_BASE + atlGridPath)
+          .as[AtlGridSchema]
+      }
+    )
 
     atlGridDs.printSchema()
     atlGridDs.show(2)
 
     // Load the df_res dataset
-    var dfResDs = spark.read
-      .format("csv")
-      .option("header", "true")
-      .schema(DF_RES_SCHEMA)
-      .load(HDFS_BASE + dfResPath)
-      .as[DfResSchema]
+    val dfResDs = time (
+      "Reading the df_res Data Set", {
+        spark.read
+          .format("csv")
+          .option("header", "true")
+          .schema(DF_RES_SCHEMA)
+          .load(HDFS_BASE + dfResPath)
+          .as[DfResSchema]
+      }
+    )
 
     dfResDs.printSchema()
     dfResDs.show(2)

@@ -33,7 +33,11 @@ trait AiraAgentLogging extends ActorLogging { this: AiraAgent ⇒
   }*/
 
   /**
-    * Will measure time elapsed of the func block passed
+    * Will measure time elapsed of the func block passed.
+    * Use it like this var list = time {List.range(1,1000, 1)} where
+    * you can replace the execution block inside the curly braces with
+    * anything you want to measure. The response of the execution block
+    * will be returned back. Think of this as a wrapper
     * @param name Name of func block for log output
     * @param block Execution block
     * @tparam R
@@ -44,7 +48,7 @@ trait AiraAgentLogging extends ActorLogging { this: AiraAgent ⇒
     val result = block    // call-by-name, will execute func block
     val t1 = System.nanoTime()
 
-    log.info("[{}] Elapsed time: {} ns", name, (t1 - t0))
+    log.info("[{}] Elapsed time: {} (s)", name, (t1 - t0) / 1E9) // Print out in seconds (nano / 1E9)
 
     result // return the result from func block
   }
