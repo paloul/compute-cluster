@@ -35,6 +35,8 @@ class Settings(config: Config) extends Extension {
   // Holds config params from application.conf concerning spark
   object spark {
     val hdfsBase: String = config.getString("application.spark.hdfs-base")
+    val master: String = config.getString("application.spark.master")
+    val appName: String = config.getString("application.spark.appName")
   }
 
   // Holds config params from application.conf concerning the Cluster App settings
