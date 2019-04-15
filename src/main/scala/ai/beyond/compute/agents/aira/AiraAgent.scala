@@ -3,6 +3,7 @@ package ai.beyond.compute.agents.aira
 import ai.beyond.compute.agents.util.db.MongoMasterAgent
 import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
 import ai.beyond.compute.logging.aira.AiraAgentLogging
+import ai.beyond.compute.sharded.ShardedAgents
 import akka.actor.{Actor, ActorSelection}
 import org.apache.spark.sql.SparkSession
 
@@ -21,11 +22,14 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   var mongoMasterAgentRef: ActorSelection = actorSelection("/user/" + MongoMasterAgent.name)
   var kafkaMasterAgentRef: ActorSelection = actorSelection("/user/" + KafkaMasterAgent.name)
 
-  // Stores a reference to the Spark session
+  // Gets a reference to the Spark Session. Spark Sessions are unique to each JVM.
+  // Agents will be sharing a Spark Session for each node. But since agents are run on
+  // different threads, they are able to submit jobs in parallel using the same Spark Session
+  // Note: Do NOT stop a Spark Session within Agent, as it will stop it JVM wide.
   // Note: This needs to be a val so implicits can be imported
   val spark: SparkSession = SparkSession.builder()
-      .master("local[*]")
-      .appName("AIRA Agent ["+agentName+"]")
+      .master(ShardedAgents.mySettings.get.spark.master)
+      .appName(ShardedAgents.mySettings.get.spark.appName + " [" + agentName + "]")
       .getOrCreate()
 
 
@@ -33,8 +37,6 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   // Actor lifecycle
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
-    super.preStart()
-
     // Get reference to helper agents
     mongoMasterAgentRef = actorSelection("/user/" + MongoMasterAgent.name)
     kafkaMasterAgentRef = actorSelection("/user/" + KafkaMasterAgent.name)
@@ -45,8 +47,7 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   }
 
   override def postStop(): Unit = {
-    super.postStop()
-    spark.close()
+
   }
   //------------------------------------------------------------------------//
   // End Actor Lifecycle

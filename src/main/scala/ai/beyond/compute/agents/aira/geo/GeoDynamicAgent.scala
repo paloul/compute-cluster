@@ -137,19 +137,21 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   //------------------------------------------------------------------------//
   override def preStart(): Unit = {
     super.preStart()
+
     log.info("GeoDynamic Agent - {} - starting", agentPath)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
-
     // Debugging information if agent is restarted
     log.error(reason, "GeoDynamic Agent restarting due to [{}] when processing [{}]",
       reason.getMessage, message.getOrElse(""))
+
+    super.preRestart(reason, message)
   }
 
   override def postStop(): Unit = {
     super.postStop()
+
     log.info("GeoDynamic Agent - {} - stopped", agentPath)
   }
   //------------------------------------------------------------------------//
@@ -259,6 +261,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     prodDs.printSchema()
     prodDs.show(2)
+    log.info("Production Data Set Length: [{}]", prodDs.count())
 
     // Load the OWCs dataset
     val owcDs = time (
@@ -274,6 +277,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     owcDs.printSchema()
     owcDs.show(2)
+    log.info("OWCs Data Set Length: [{}]", owcDs.count())
 
     // Load the faults dataset
     val faultDs = time (
@@ -289,6 +293,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     faultDs.printSchema()
     faultDs.show(2)
+    log.info("Faults Data Set Length: [{}]", faultDs.count())
 
     // Load the perforations dataset
     val perfDs = time (
@@ -304,6 +309,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     perfDs.printSchema()
     perfDs.show(2)
+    log.info("Perforations Data Set Length: [{}]", perfDs.count())
 
     // Load the trajectory dataset
     val trajDs = time (
@@ -319,6 +325,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     trajDs.printSchema()
     trajDs.show(2)
+    log.info("Trajectory Data Set Length: [{}]", trajDs.count())
 
     // Load the geo mean dataset
     val geoMeanDs = time (
@@ -334,6 +341,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     geoMeanDs.printSchema()
     geoMeanDs.show(2)
+    log.info("Geo Mean Data Set Length: [{}]", geoMeanDs.count())
 
     // Load the ATL_MAT dataset
     val atlMatDs = time (
@@ -349,6 +357,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     atlMatDs.printSchema()
     atlMatDs.show(2)
+    log.info("ATL_MAT Data Set Length: [{}]", atlMatDs.count())
 
     // Load the ATL_GRID dataset
     val atlGridDs = time (
@@ -364,6 +373,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     atlGridDs.printSchema()
     atlGridDs.show(2)
+    log.info("ATL_GRID Data Set Length: [{}]", atlGridDs.count())
 
     // Load the df_res dataset
     val dfResDs = time (
@@ -379,6 +389,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     dfResDs.printSchema()
     dfResDs.show(2)
+    log.info("df_res Data Set Length: [{}]", dfResDs.count())
   }
 
   def runCompute(id: String): Unit = {
