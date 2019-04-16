@@ -127,10 +127,6 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     var lastKnownUpdate: Long = 0 // UNIX Timestamp
   }
 
-  // Temporary Cancellable future connected to the underlying compute job mimic block
-  // See below - in the runCompute function
-  var computeJob: Cancellable = _
-
 
   //------------------------------------------------------------------------//
   // Actor lifecycle
@@ -192,12 +188,10 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
 
     case CompleteJob(id) =>
       log.info("Finalizing the Compute Job [{}] and marking completion", id)
-      computeJob.cancel()
       become(completed)
 
     case CancelJob(id) =>
       log.info("Cancelling the Compute Job [{}]", id)
-      computeJob.cancel()
       become(cancelled)
   }
 
@@ -390,45 +384,6 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     dfResDs.printSchema()
     dfResDs.show(2)
     log.info("df_res Data Set Length: [{}]", dfResDs.count())
-  }
-
-  def runCompute(id: String): Unit = {
-    /////////////////////////////////////////////////////////////////////////
-    // FIXME: GKP - 2019-02-27
-    //  This block just mimics potential compute being done
-    //  It sets up a scheduler that sends out status messages over kafka using the KafkaProducer Agent
-    //  After 30-80 messages sent it will send itself a CompleteJob message which will cancel the Scheduler
-    //  and mark completion of the simulated job
-    var messageCount: Int = 0
-    def roundUp(f: Float) = math.ceil(f).toInt
-    val totalMessages:Float = 30 + (new scala.util.Random).nextInt((100 - 30) + 1) // random num between 30 and 100
-    computeJob = system.scheduler.schedule(250 milliseconds, 1000 milliseconds) {
-
-      if (messageCount >= totalMessages) self ! CompleteJob(id)
-
-      messageCount = messageCount + 1 // Increment messages sent
-
-      // Calculate percentage complete based on messages sent and randomly chosen total num of messages to send
-      // This basically simulates the amount of work that needs to be done
-      this.META_PROPS.percentComplete = Math.min(roundUp((messageCount / totalMessages) * 100), 100)
-      this.META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
-
-      // Ask yourself what state you are in, since this is an ASK, we need to Await Result
-      val future = self ? GetState(id) // GetState returns back a State message
-      val state = Await.result(future, TIMEOUT.duration).asInstanceOf[State]
-
-      // Create new json to send over kafka
-      /*val json = JsObject(
-        "id" -> JsString(id),
-        "state" -> JsString(state.state),
-        "socketeer" -> JsString(META_PROPS.socketeer),
-        "percentComplete" -> JsNumber(state.percentComplete))
-
-      // Send the kafka master agent a message to send over kafka via its producer agent children
-      kafkaMasterAgentRef ! KafkaProducerAgent.Message(TOPIC_JOBSTATUS, id, json.toString())*/
-    }
-    /////////////////////////////////////////////////////////////////////////
-
   }
 
 }
