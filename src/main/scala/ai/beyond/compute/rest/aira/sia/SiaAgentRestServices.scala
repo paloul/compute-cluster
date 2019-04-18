@@ -72,7 +72,8 @@ class SiaAgentRestServices(agents: ActorRef, system: ActorSystem)(implicit timeo
             val future = agents ? siaAgentStart
 
             // Await a response from the agent that we told to the start to pass back to the
-            // caller if we had a successful initiate call
+            // caller if we had a successful initiate call, if anything was wrong like
+            // incorrect parameters in JSON then this will notify the caller of what went wrong
             val state = Await.result(future, timeout.duration).asInstanceOf[SiaAgent.State]
 
             complete(state)
