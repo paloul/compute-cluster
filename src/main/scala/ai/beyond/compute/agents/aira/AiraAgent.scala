@@ -5,7 +5,7 @@ import ai.beyond.compute.agents.util.kafka.KafkaMasterAgent
 import ai.beyond.compute.logging.aira.AiraAgentLogging
 import ai.beyond.compute.sharded.ShardedAgents
 import akka.actor.{Actor, ActorSelection}
-import org.apache.spark.sql.SparkSession
+//import org.apache.spark.sql.SparkSession
 
 // TODO: Add anything else common between all Aira agents
 
@@ -27,11 +27,13 @@ abstract class AiraAgent extends Actor with AiraAgentLogging {
   // different threads, they are able to submit jobs in parallel using the same Spark Session
   // Note: Do NOT stop a Spark Session within Agent, as it will stop it JVM wide.
   // Note: This needs to be a val so implicits can be imported
-  val spark: SparkSession = SparkSession.builder()
+  /*val spark: SparkSession = SparkSession.builder()
       .master(ShardedAgents.mySettings.get.spark.master)
       .appName(ShardedAgents.mySettings.get.spark.appName + " [" + agentName + "]")
-      .getOrCreate()
+      .getOrCreate()*/
 
+  // Constants
+  val HDFS_BASE: String = ShardedAgents.mySettings.get.hdfs.hdfsBase
 
   //------------------------------------------------------------------------//
   // Actor lifecycle

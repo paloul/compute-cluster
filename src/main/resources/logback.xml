@@ -57,6 +57,9 @@
     <!-- Turn down hadoop noise -->
     <logger name="org.apache.hadoop" level="WARN" />
 
+    <!-- Turn down mxnet noise -->
+    <logger name="org.apache.mxnet" level="WARN" />
+
     <!-- Turn down nio -->
     <logger name="io.netty" level="WARN" />
 

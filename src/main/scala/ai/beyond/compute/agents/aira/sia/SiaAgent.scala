@@ -1,19 +1,31 @@
 package ai.beyond.compute.agents.aira.sia
 
+import java.io.File
+
 import ai.beyond.compute.agents.aira.AiraAgent
 import ai.beyond.compute.sharded.{ShardedAgents, ShardedMessages}
 import akka.actor.Props
+import akka.cluster.sharding.ShardRegion.Passivate
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.util.Timeout
-import org.apache.spark.sql.Encoders
-import spray.json.DefaultJsonProtocol
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import spray.json.DefaultJsonProtocol
+import java.time.Instant
+import java.util.concurrent.Executors
 
-import org.apache.spark.mllib.linalg.{Matrix, Matrices}
+import concurrent.ExecutionContext
+import kantan.csv._
+import kantan.csv.ops._
+import org.nd4j.linalg.factory.Nd4j
 
 object SiaAgent extends ShardedMessages {
   def props(agentId: String) = Props(new SiaAgent)
+
+  // Execution Pool for Processing Data
+  private val procExecutorService = Executors.newFixedThreadPool(6 )
+  private val procExecutionContext = ExecutionContext.fromExecutorService(procExecutorService)
 
   // Create the catch Message type for this agent
   // This will allows us to determine which shard manager
@@ -26,11 +38,11 @@ object SiaAgent extends ShardedMessages {
   ///////////////////////
   // Ask based Messages
   case class GetState(id: String) extends Message
-  case class State(id: String, state: String, percentComplete: Int, lastUpdated: Long) extends Message
+  case class State(id: String, state: String, metaProps: MetaProps) extends Message
 
   // Tell-based messages
   case class Start(id: String, voiDimensions: List[Int],
-                   resVoiFileName: String, faultVoiFileName: String) extends Message
+                   voiResFileName: String, voiFaultFileName: String) extends Message
   case class CancelJob(id: String) extends Message
   case class CompleteJob(id: String) extends Message
 
@@ -55,17 +67,38 @@ object SiaAgent extends ShardedMessages {
   // Data Type Schema Specifications
   ///////////////////////
   //,x,y,z,nx,ny,nz,Porosity,PermX,PermZ,BulkVolume,PermY,Zones
-  case class VoiRes(i: Int, x: Float, y: Float, z: Float,
-                    nx: Float, ny: Float, nz: Float, porosity: Float,
-                    permeabilityX: Float, permeabilityZ: Float, bulkVolume: Float,
-                    permeabilityY: Float, zones: Float)
-  private val VOI_RES_SCHEMA = Encoders.product[VoiRes].schema
+  final case class VoiRes(i: Int, x: Float, y: Float, z: Float,
+                    nx: Int, ny: Int, nz: Int, porosity: Float,
+                    permX: Float, permZ: Float, bulkVolume: Float,
+                    permY: Float, zones: Float)
+  implicit val voiResDecoder: RowDecoder[VoiRes] =
+    RowDecoder.ordered { (i: Int, x: Float, y: Float, z: Float,
+                          nx: Float, ny: Float, nz: Float, porosity: Float,
+                          permX: Float, permZ: Float, bulkVolume: Float,
+                          permY: Float, zones: Float) =>
+      // nx, ny, nz and zones are floats in the data, but VoiRes needs to represent them
+      // as integers because they are used for indexing and zones
+    new VoiRes(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, porosity, permX, permZ, bulkVolume, permY, zones.toInt)
+  }
 
   //,x,y,z,nx,ny,nz,Index,OrigName
-  case class VoiFault(i: Int, x: Float, y: Float, z: Float,
+  final case class VoiFault(i: Int, x: Float, y: Float, z: Float,
                     nx: Float, ny: Float, nz: Float, index: Float, origName: Int)
-  private val VOI_FAULT_SCHEMA = Encoders.product[VoiFault].schema
+  implicit val voiFaultDecoder: RowDecoder[VoiFault] =
+    RowDecoder.ordered { (i: Int, x: Float, y: Float, z: Float,
+                          nx: Float, ny: Float, nz: Float, index: Float, origName: Int) =>
+      new VoiFault(i, x, y, z, nx, ny, nz, index, origName)
+    }
+  ///////////////////////
 
+
+  ///////////////////////
+  // Supporting Data Types
+  ///////////////////////
+  // Used to hold metadata properties for each Sia job
+  final case class MetaProps(var voiDimX: Int = 0, var voiDimY: Int = 0, var voiDimZ: Int = 0,
+                             var voiResFileName: String = "", var voiFaultFileName: String = "",
+                             var percentComplete: Int = 0, var lastKnownStage: String = "", var lastKnownUpdate: Long = 0)
   ///////////////////////
 }
 
@@ -73,33 +106,25 @@ object SiaAgent extends ShardedMessages {
 // Helps marshall the messages between JSON received via HTTP APIs
 trait SiaAgentJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   // Add any messages that you need to be marshalled back and forth from/to json
+  implicit val metaPropsFormat = jsonFormat8(SiaAgent.MetaProps) // First because used by stateFormat
   implicit val startFormat = jsonFormat4(SiaAgent.Start)
-  implicit val stateFormat = jsonFormat4(SiaAgent.State)
+  implicit val stateFormat = jsonFormat3(SiaAgent.State)
 }
 
 /**
   * The Agent controlling the Sia processing logic. Makes heavy use of Spark clusters (*SHOULD*)
   */
-class SiaAgent extends AiraAgent {
+class SiaAgent extends AiraAgent  {
   // Import all available functions under the context handle, i.e. become, actorSelection, system
   import context._
   // Import the companion object above to use the messages defined for us
   import SiaAgent._
-  // Import implicits specific to spark session
-  import spark.implicits._
-
-  // Constants
-  val HDFS_BASE: String = ShardedAgents.mySettings.get.spark.hdfsBase
 
   // Meta property object to store any meta data
-  object META_PROPS {
-    var voiDimensionsX: Int = 0
-    var voiDimensionsY: Int = 0
-    var voiDimensionsZ: Int = 0
-    var percentComplete: Int = 0 // 0-100
-    var lastKnownUpdate: Long = 0 // UNIX Timestamp
-  }
+  var META_PROPS = MetaProps()
 
+  // Constants
+  val BASE_FILE_PATH: String = ShardedAgents.mySettings.get.sia.files.basePath
 
 
 
@@ -141,7 +166,7 @@ class SiaAgent extends AiraAgent {
   def idle: Receive = {
     case GetState(id) =>
       log.info("ID[{}] is in an idle state", id)
-      sender ! State(id, "Idle", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
+      sender ! State(id, "Idle", META_PROPS)
 
     case PrintPath(id) =>
       log.info("My, [{}], path is {}", id, agentPath)
@@ -149,32 +174,42 @@ class SiaAgent extends AiraAgent {
     case HelloThere(id, msgBody) =>
       log.info("Hello there, [{}], you said, '{}'", id, msgBody)
 
-    case Start(id, voiDimensions, resVoiFileName, faultVoiFileName) =>
+    case Start(id, voiDimensions, voiResFileName, voiFaultFileName) =>
       log.info("Starting compute with job ID[{}]", id)
 
+      // Store the items we received to start processing in META_PROPS
+      META_PROPS.voiResFileName = voiResFileName
+      META_PROPS.voiFaultFileName = voiFaultFileName
       // voi dimensions should always be length 3
-      // TODO: Have a check in place to verify we have 3 items for X, Y, Z
-      META_PROPS.voiDimensionsX = voiDimensions(0)
-      META_PROPS.voiDimensionsY = voiDimensions(1)
-      META_PROPS.voiDimensionsZ = voiDimensions(2)
+      META_PROPS.voiDimX = voiDimensions(0)
+      META_PROPS.voiDimY = voiDimensions(1)
+      META_PROPS.voiDimZ = voiDimensions(2)
 
-      sender ! State(id, "Starting", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
-      startProcessing(id, resVoiFileName, faultVoiFileName)
-      become(computing)
+      // TODO: Verify all the provided parameters are valid, i.e. data types/lengths and files are found
+
+      // Reply back to sender that we are officially starting, if any errors were come across
+      // with the provided parameters, i.e types or file not found, this is where you would
+      // notify the sender of what went wrong.
+      sender ! State(id, "Starting", META_PROPS)
+
+      // Provided parameters were ok at this point, let's start processing
+      startProcessing(id)
   }
 
   // Computing behavior state
-  def computing: Receive = {
+  def running: Receive = {
     case GetState(id) =>
-      log.info("ID[{}] is currently computing", id)
-      sender ! State(id, "Running", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
+      log.info("ID[{}] is currently running", id)
+      sender ! State(id, "Running", META_PROPS)
 
     case CompleteJob(id) =>
-      log.info("Finalizing the Compute Job [{}] and marking completion", id)
+      log.info("Finalizing the Sia Job [{}] and marking completion", id)
+      // TODO: Mark completion, whatever that means
       become(completed)
 
     case CancelJob(id) =>
-      log.info("Cancelling the Compute Job [{}]", id)
+      log.info("Cancelling the Sia Job [{}]", id)
+      // TODO: Mark cancellation and stop underlying long running tasks
       become(cancelled)
   }
 
@@ -182,14 +217,14 @@ class SiaAgent extends AiraAgent {
   def cancelled: Receive = {
     case GetState(id) =>
       log.info("ID[{}] has been cancelled", id)
-      sender ! State(id, "Cancelled", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
+      sender ! State(id, "Cancelled", META_PROPS)
   }
 
   // Completed behavior state
   def completed: Receive = {
     case GetState(id) =>
       log.info("ID[{}] has completed", id)
-      sender ! State(id, "Completed", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
+      sender ! State(id, "Completed", META_PROPS)
   }
   //
   //------------------------------------------------------------------------//
@@ -199,48 +234,96 @@ class SiaAgent extends AiraAgent {
 
 
 
+  //------------------------------------------------------------------------//
+  // Helper Future Wrapped Functions
+  //------------------------------------------------------------------------//
   /**
-    * Start Sia processing starting with the raw data files
+    * Helper function to start long running data processing with an Execution Context
+    * in possession of a separate thread pool.
     * @param id
-    * @param voiResFileName
-    * @param voiFaultFileName
+    * @return A Future with MetaProps about the job
     */
-  def startProcessing(id: String, voiResFileName: String, voiFaultFileName: String): Unit = {
+  def startProcessing(id: String): Future[MetaProps] = Future {
+    // Change our behavior state to running in order to treat incoming messages differently
+    become(running)
 
-    log.info("File paths: {}, {}", voiResFileName, voiFaultFileName)
+    META_PROPS.lastKnownStage = "Started Processing"
+    META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
 
-    // Load the res voi file
-    val voiResDs = time (
-      "Reading file ["+HDFS_BASE+voiResFileName+"]", {
-        spark.read
-          .format("csv")
-          .option("header", "true")
-          .schema(VOI_RES_SCHEMA)
-          .load(HDFS_BASE + voiResFileName)
-          .as[VoiRes].cache() // cache so that we can build out the 3D matrices and not read each time
-      }
-    )
-    voiResDs.printSchema()
-    voiResDs.show(5)
-    log.info("VOI Res Data Set Length: [{}]", voiResDs.count())
+    // TODO: Call long running tasks here which will run in the execution context specific for sia data jobs
+    readFilesGenerateMatrices()
 
-    // Load the res fault file
-    val voiFaultDs = time (
-      "Reading file ["+HDFS_BASE+voiFaultFileName+"]", {
-        spark.read
-          .format("csv")
-          .option("header", "true")
-          .schema(VOI_FAULT_SCHEMA)
-          .load(HDFS_BASE + voiFaultFileName)
-          .as[VoiFault].cache() // cache so that we can build out the 3D matrices and not read each time
-      }
-    )
-    voiFaultDs.printSchema()
-    voiFaultDs.show(5)
-    log.info("VOI Fault Data Set Length: [{}]", voiFaultDs.count())
+    META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 
-    
+  }(procExecutionContext)
+  //------------------------------------------------------------------------//
+  // End Helper Future Wrapped Functions
+  //------------------------------------------------------------------------//
 
+
+
+
+  //------------------------------------------------------------------------//
+  // Private Processing Functions
+  //------------------------------------------------------------------------//
+
+  /**
+    * readFilesGenerateMatrices
+    *
+    */
+  private def readFilesGenerateMatrices(): Unit = {
+
+    META_PROPS.lastKnownStage = "readFilesGenerateMatrices"
+    META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
+
+    // Create the mxnet ndarray based matrices
+    // for permeabilityX
+    val permMatrixX = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // for permeabilityY
+    val permMatrixY = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // for permeabilityZ
+    val permMatrixZ = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // for porosity
+    val porosityMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // for bulk Volume
+    val bulkVolMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // for zones
+    val zonesMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+
+    time("Reading/Processing VOI Res file", {
+      // Create a buffered source to the voi res file, we do this because there is no need to load
+      // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
+      // with the raw data and then discard the raw data.
+      // Iterate over huge CSV files this way without loading more than one row at a time in memory.
+      val voiResFile = new File(BASE_FILE_PATH + META_PROPS.voiResFileName)
+      val voiResIterator = voiResFile.asCsvReader[VoiRes](rfc.withHeader)
+
+      // Read Result is of type Either - https://www.scala-lang.org/api/current/scala/util/Either.html
+      voiResIterator.foreach( readResult => {
+        readResult match {
+            // Right side of read result is our actual value, IF everything went well reading it
+          case Right(voiRes) => {
+            permMatrixX.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
+            permMatrixY.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
+            permMatrixZ.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
+            porosityMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.porosity)
+            bulkVolMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.bulkVolume)
+            zonesMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.zones)
+          }
+            // Left side of read result is the error, IF something went bad
+          case Left(error) => {
+            log.error("Error parsing a line from [{}]", META_PROPS.voiResFileName)
+            log.error(error.getMessage)
+          }
+        }
+      })
+    })
+
+
+
+    //context.parent ! Passivate(stopMessage = SiaAgent.Stop)
   }
-
+  //------------------------------------------------------------------------//
+  // End Private Processing Functions
+  //------------------------------------------------------------------------//
 }

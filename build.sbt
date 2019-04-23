@@ -4,7 +4,7 @@ organization := "ai.beyond"
 
 version := "0.0.1"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.11.12"
 
 exportJars := true
 
@@ -23,7 +23,8 @@ libraryDependencies ++= {
   val akkaVersion = "2.5.20"
   val akkaHttpVersion = "10.1.7"
   val akkaPersistenceCassandra = "0.93"
-  val sparkVersion = "2.4.0"
+  //val mxNetVersion = "1.4.0"
+  val nd4jVersion = "1.0.0-beta3"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -58,13 +59,21 @@ libraryDependencies ++= {
 
     // Mongo client
     "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0",
-    
-    // Spark
-    "org.apache.spark" %% "spark-core" % sparkVersion,
-    "org.apache.spark" %% "spark-sql" % sparkVersion,
-    "org.apache.spark" %% "spark-mllib" % sparkVersion,
-    // Spark dependencies
-    "org.scala-lang.modules" %% "scala-xml" % "1.1.1"
+
+    // kanban.csv - https://nrinaudo.github.io/kantan.csv/
+    "com.nrinaudo" %% "kantan.csv" % "0.5.0",
+    "com.nrinaudo" %% "kantan.csv-java8" % "0.5.0",
+    "com.nrinaudo" %% "kantan.csv-generic" % "0.5.0",
+
+    // org.apache.mxnet
+    //"org.apache.mxnet" % "mxnet-full_2.11-osx-x86_64-cpu" % mxNetVersion,
+    /*"org.apache.mxnet" % "mxnet-full_2.11-linux-x86_64-cpu" % mxNetVersion,
+    "org.apache.mxnet" % "mxnet-full_2.11-linux-x86_64-gpu" % mxNetVersion,*/
+
+    // https://deeplearning4j.org/docs/latest/deeplearning4j-config-buildtools
+    "org.deeplearning4j" % "deeplearning4j-core" % nd4jVersion,
+    "org.nd4j" % "nd4j-native-platform" % nd4jVersion,
+    "org.nd4j" % "nd4j-native" % nd4jVersion
   )
 }
 

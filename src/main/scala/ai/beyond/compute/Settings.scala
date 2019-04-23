@@ -32,11 +32,15 @@ class Settings(config: Config) extends Extension {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
 
-  // Holds config params from application.conf concerning spark
-  object spark {
-    val hdfsBase: String = config.getString("application.spark.hdfs-base")
-    val master: String = config.getString("application.spark.master")
-    val appName: String = config.getString("application.spark.appName")
+  // Holds config params from application.conf concerning hdfs
+  object hdfs {
+    val hdfsBase: String = config.getString("application.hdfs.base-path")
+  }
+
+  object sia {
+    object files {
+      val basePath: String = config.getString("application.sia.files.base-path")
+    }
   }
 
   // Holds config params from application.conf concerning the Cluster App settings
