@@ -25,6 +25,7 @@ libraryDependencies ++= {
   val akkaPersistenceCassandra = "0.93"
   //val mxNetVersion = "1.4.0"
   val nd4jVersion = "1.0.0-beta3"
+  val smileVersion = "1.5.2"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -73,7 +74,11 @@ libraryDependencies ++= {
     // https://deeplearning4j.org/docs/latest/deeplearning4j-config-buildtools
     "org.deeplearning4j" % "deeplearning4j-core" % nd4jVersion,
     "org.nd4j" % "nd4j-native-platform" % nd4jVersion,
-    "org.nd4j" % "nd4j-native" % nd4jVersion
+    "org.nd4j" % "nd4j-native" % nd4jVersion,
+
+    // Smile (Statistical Machine Intelligence and Learning Engine)
+    // https://github.com/haifengl/smile
+    "com.github.haifengl" %% "smile-scala" % smileVersion
   )
 }
 

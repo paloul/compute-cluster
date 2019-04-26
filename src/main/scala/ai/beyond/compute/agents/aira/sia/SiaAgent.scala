@@ -83,11 +83,11 @@ object SiaAgent extends ShardedMessages {
 
   //,x,y,z,nx,ny,nz,Index,OrigName
   final case class VoiFault(i: Int, x: Float, y: Float, z: Float,
-                    nx: Float, ny: Float, nz: Float, index: Float, origName: Int)
+                    nx: Int, ny: Int, nz: Int, index: Int, origName: String)
   implicit val voiFaultDecoder: RowDecoder[VoiFault] =
     RowDecoder.ordered { (i: Int, x: Float, y: Float, z: Float,
-                          nx: Float, ny: Float, nz: Float, index: Float, origName: Int) =>
-      new VoiFault(i, x, y, z, nx, ny, nz, index, origName)
+                          nx: Float, ny: Float, nz: Float, index: Float, origName: String) =>
+      new VoiFault(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, index.toInt, origName)
     }
   ///////////////////////
 
@@ -245,13 +245,15 @@ class SiaAgent extends AiraAgent  {
     */
   def startProcessing(id: String): Future[MetaProps] = Future {
     // Change our behavior state to running in order to treat incoming messages differently
-    become(running)
+    //become(running) // FIXME: uncomment this for production, commented out to help testing (stay in state)
 
-    META_PROPS.lastKnownStage = "Started Processing"
+    META_PROPS.lastKnownStage = "startProcessing(id: String)"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
 
-    // TODO: Call long running tasks here which will run in the execution context specific for sia data jobs
-    readFilesGenerateMatrices()
+    // Here we can start our long running tasks, this function
+    // should be running in its own execution context. Have fun with
+    // background processes, as they will not stop regular agent functionality
+    val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
     META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 
@@ -268,60 +270,60 @@ class SiaAgent extends AiraAgent  {
   //------------------------------------------------------------------------//
 
   /**
-    * readFilesGenerateMatrices
-    *
+    * readFilesGenerateMatrix
+    * @return Four-Dimensional INDArray from ND4J that represents the reservoir
+    *         in 3D with the properties assigned in the 4th dimension
     */
-  private def readFilesGenerateMatrices(): Unit = {
+  private def readFilesGenerateMatrix() = {
 
-    META_PROPS.lastKnownStage = "readFilesGenerateMatrices"
+    META_PROPS.lastKnownStage = "readFilesGenerateMatrix()"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
 
-    // Create the mxnet ndarray based matrices
-    // for permeabilityX
-    val permMatrixX = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
-    // for permeabilityY
-    val permMatrixY = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
-    // for permeabilityZ
-    val permMatrixZ = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
-    // for porosity
-    val porosityMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
-    // for bulk Volume
-    val bulkVolMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
-    // for zones
-    val zonesMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // main reservoir matrix that holds our data, 4-dimensional array with the 4th dimension holding values
+    // The 4th dimension is an array holding properties of reservoirs coming from raw data.
+    // NOTE: 2019-04-26 - The 4th dimension is only of length 1 for now as we only use Permeability X
+    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 1)
 
-    time("Reading/Processing VOI Res file", {
-      // Create a buffered source to the voi res file, we do this because there is no need to load
-      // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
-      // with the raw data and then discard the raw data.
-      // Iterate over huge CSV files this way without loading more than one row at a time in memory.
-      val voiResFile = new File(BASE_FILE_PATH + META_PROPS.voiResFileName)
-      val voiResIterator = voiResFile.asCsvReader[VoiRes](rfc.withHeader)
+    // Create a buffered source to the voi res file, we do this because there is no need to load
+    // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
+    // with the raw data and then discard the raw data.
+    // Iterate over huge CSV files this way without loading more than one row at a time in memory.
+    val voiResFile = new File(BASE_FILE_PATH + META_PROPS.voiResFileName)
+    val voiResIterator = voiResFile.asCsvReader[VoiRes](rfc.withHeader)
 
-      // Read Result is of type Either - https://www.scala-lang.org/api/current/scala/util/Either.html
-      voiResIterator.foreach( readResult => {
-        readResult match {
-            // Right side of read result is our actual value, IF everything went well reading it
-          case Right(voiRes) => {
-            permMatrixX.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
-            permMatrixY.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
-            permMatrixZ.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
-            porosityMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.porosity)
-            bulkVolMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.bulkVolume)
-            zonesMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.zones)
-          }
-            // Left side of read result is the error, IF something went bad
-          case Left(error) => {
-            log.error("Error parsing a line from [{}]", META_PROPS.voiResFileName)
-            log.error(error.getMessage)
-          }
+    //val voiFaultFile = new File(BASE_FILE_PATH + META_PROPS.voiFaultFileName)
+    //val voiFaultIterator = voiFaultFile.asCsvReader[VoiFault](rfc.withHeader)
+
+    // Read Result is of type Either - https://www.scala-lang.org/api/current/scala/util/Either.html
+    voiResIterator.foreach( readResult => {
+      readResult match {
+        // Right side of read result is our actual value, IF everything went well reading it
+        case Right(voiRes) => {
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.permX)
         }
-      })
+        // Left side of read result is the error, IF something went bad
+        case Left(error) => {
+          log.error("Error parsing a line from [{}]", META_PROPS.voiResFileName)
+          log.error(error.getMessage)
+        }
+      }
     })
 
+    /*voiFaultIterator.foreach( readResult => {
+      readResult match {
+        // Right side of read result is our actual value, IF everything went well reading it
+        case Right(voiFault) => {
+          faultIndexMatrix.putScalar(Array(voiFault.nx, voiFault.ny, voiFault.nz), voiFault.index)
+        }
+        case Left(error) => {
+          log.error("Error parsing a line from [{}]", META_PROPS.voiFaultFileName)
+          log.error(error.getMessage)
+        }
+      }
+    })*/
 
-
-    //context.parent ! Passivate(stopMessage = SiaAgent.Stop)
+    // At this point the reservoirMatrix should be populated with the data, return it
+    reservoirMatrix
   }
   //------------------------------------------------------------------------//
   // End Private Processing Functions
