@@ -25,7 +25,7 @@ libraryDependencies ++= {
   val akkaPersistenceCassandra = "0.93"
   //val mxNetVersion = "1.4.0"
   val nd4jVersion = "1.0.0-beta3"
-  val smileVersion = "1.5.2"
+  //val smileVersion = "1.5.2"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -78,7 +78,7 @@ libraryDependencies ++= {
 
     // Smile (Statistical Machine Intelligence and Learning Engine)
     // https://github.com/haifengl/smile
-    "com.github.haifengl" %% "smile-scala" % smileVersion
+    //"com.github.haifengl" %% "smile-scala" % smileVersion
   )
 }
 

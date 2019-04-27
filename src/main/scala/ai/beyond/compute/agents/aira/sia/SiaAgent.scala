@@ -23,7 +23,8 @@ import org.nd4j.linalg.factory.Nd4j
 object SiaAgent extends ShardedMessages {
   def props(agentId: String) = Props(new SiaAgent)
 
-  // Execution Pool for Processing Data
+  // Execution Pool for Processing Data, these allow agents to perform long-running
+  // tasks on a different thread pool separate from main message handler
   private val procExecutorService = Executors.newFixedThreadPool(6 )
   private val procExecutionContext = ExecutionContext.fromExecutorService(procExecutorService)
 
@@ -272,7 +273,7 @@ class SiaAgent extends AiraAgent  {
   /**
     * readFilesGenerateMatrix
     * @return Four-Dimensional INDArray from ND4J that represents the reservoir
-    *         in 3D with the properties assigned in the 4th dimension
+    *         in 3D with the properties stored in the 4th dimension
     */
   private def readFilesGenerateMatrix() = {
 
