@@ -2,6 +2,7 @@ package ai.beyond.compute.agents.aira.sia
 
 import java.io.File
 
+import ai.beyond.compute.modules.image.segmentation.slic
 import ai.beyond.compute.agents.aira.AiraAgent
 import ai.beyond.compute.sharded.{ShardedAgents, ShardedMessages}
 import akka.actor.Props
@@ -255,6 +256,8 @@ class SiaAgent extends AiraAgent  {
     // should be running in its own execution context. Have fun with
     // background processes, as they will not stop regular agent functionality
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
+
+    slic(reservoirMatrix, reservoirMatrix.shape())
 
     META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 

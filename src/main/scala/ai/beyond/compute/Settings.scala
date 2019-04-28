@@ -5,12 +5,12 @@ import java.util.Properties
 import scala.concurrent.duration._
 import akka.actor._
 import com.typesafe.config.Config
-import org.nd4j.linalg.api.buffer.DataBuffer
-import org.nd4j.linalg.factory.Nd4j
 
-// This companion object here should not be touched, its basic infrastructure support
-// to help create a connection between our application.conf file, Settings class
-// and the Actor System.
+/**
+  * This companion object here should not be touched, its basic infrastructure support
+  * to help create a connection between our application.conf file, Settings class
+  * and the Actor System.
+  */
 object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
 
   // The apply method is a scala way of working with
@@ -30,18 +30,15 @@ object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
   override def get(system: ActorSystem): Settings = super.get(system)
 }
 
+/**
+  * Settings class to help parse applciation.conf and make values available
+  * during runtime of application. If you want something from app.conf
+  * available in application then add objects and parsing logic here
+  * @param config
+  */
 class Settings(config: Config) extends Extension {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
-
-  // Holds config params from application.conf concerning n4dj settings
-  object nd4j {
-    // Get a setting from application.conf and immediately set it here because it is globally used
-    // in the underlying ND4j library.
-    val useDoublePrecision: Boolean = config.getBoolean("application.nd4j.use-double-precision")
-    if (useDoublePrecision) Nd4j.setDataType(DataBuffer.Type.DOUBLE)
-    else Nd4j.setDataType(DataBuffer.Type.FLOAT)
-  }
 
   // Holds config params from application.conf concerning hdfs
   object hdfs {
