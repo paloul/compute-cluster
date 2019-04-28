@@ -1,6 +1,7 @@
 package ai.beyond.compute.modules.image.segmentation
 
 import org.nd4j.linalg.api.ndarray.INDArray
+import org.nd4j.linalg.factory.Nd4j
 
 object slic {
 
@@ -36,11 +37,10 @@ object slic {
     * @param maxSizeFactor       Proportion of the maximum connected segment size. A value of 3 works
     *                            in most of the cases.
     * @param runSlicZero         Run SLIC-zero, the zero-parameter mode of SLIC.
-    *
+    * @return                    3D INDArray of integers indicating segment labels
     */
   def getSegments (
             matrix: INDArray,
-            shape: Array[Int],
             numSegments: Int = 100,
             compactness: Float = 10f,
             maxIteration: Int = 10,
@@ -51,14 +51,49 @@ object slic {
             minSizeFactor: Float = 0.5f,
             maxSizeFactor: Float = 3f,
             runSlicZero: Boolean = false
-          ) (implicit log: akka.event.LoggingAdapter) {
+          ) (implicit log: akka.event.LoggingAdapter): INDArray = {
 
-    log.info("Starting SLIC Algorithm...")
+    log.info("Starting SLIC...")
 
+    // Introduce any checks here, add the functions calls to the list
+    // Each function call will be evaluated and results stored in checks list
+    val checks = List[Boolean](
+      checkDimensions(matrix)
+    )
 
+    // Loop through the checks list and make sure everything passed
+    // If checks passed then execute the core _getSegments func
+    if (checks.forall(identity)) {
+      _getSegments(matrix)
+    } else {
+      // If any checks failed then reply back with empty INDArray
+      log.error("SLIC Parameter Checks failed. Stopping.")
+      Nd4j.empty()
+    }
   }
 
-  private def _getSegments (): Unit = {
+  /**
+    * The main private function that does the SLIC algorithm
+    * @param matrix
+    * @param log Implicitly provided logger
+    * @return 3D INDArray of integers indicating segment labels
+    */
+  private def _getSegments (matrix: INDArray)(implicit log: akka.event.LoggingAdapter): INDArray = {
+    Nd4j.zeros(1,1,1)
+  }
 
+  /**
+    * Checks Dimensions of the given matrix
+    * @param matrix
+    * @param log Implicitly provided logger
+    * @return True if matrix dimensions equal 4, false for anything else
+    */
+  private def checkDimensions(matrix: INDArray)(implicit log: akka.event.LoggingAdapter): Boolean = {
+    if (matrix.shape().length == 4) {
+      true
+    } else {
+      log.warning("SLIC expects Matrix with 4 dimensions. Given Matrix only has [{}]", matrix.shape().length)
+      false
+    }
   }
 }

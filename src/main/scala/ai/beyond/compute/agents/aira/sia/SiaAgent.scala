@@ -257,7 +257,9 @@ class SiaAgent extends AiraAgent  {
     // background processes, as they will not stop regular agent functionality
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
-    slic(reservoirMatrix, reservoirMatrix.shape())
+    // SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
+    // to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
+    slic.getSegments(reservoirMatrix)
 
     META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 
