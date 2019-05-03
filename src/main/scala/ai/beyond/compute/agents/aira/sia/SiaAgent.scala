@@ -247,7 +247,7 @@ class SiaAgent extends AiraAgent  {
     */
   def startProcessing(id: String): Future[MetaProps] = Future {
     // Change our behavior state to running in order to treat incoming messages differently
-    //become(running) // FIXME: uncomment this for production, commented out to help testing (stay in state)
+    become(running)
 
     META_PROPS.lastKnownStage = "startProcessing(id: String)"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
