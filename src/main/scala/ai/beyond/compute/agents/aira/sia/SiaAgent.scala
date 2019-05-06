@@ -2,7 +2,6 @@ package ai.beyond.compute.agents.aira.sia
 
 import java.io.File
 
-import ai.beyond.compute.modules.image.segmentation.slic
 import ai.beyond.compute.agents.aira.AiraAgent
 import ai.beyond.compute.sharded.{ShardedAgents, ShardedMessages}
 import akka.actor.Props
@@ -16,12 +15,20 @@ import spray.json.DefaultJsonProtocol
 import java.time.Instant
 import java.util.concurrent.Executors
 
+import ai.beyond.compute.modules.image.segmentation.SLIC
+
 import concurrent.ExecutionContext
 import kantan.csv._
 import kantan.csv.ops._
+import org.nd4j.linalg.api.buffer.DataBuffer
+import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 
 object SiaAgent extends ShardedMessages {
+  def configure() = {
+    Nd4j.setDataType(DataBuffer.Type.FLOAT)
+  }
+
   def props(agentId: String) = Props(new SiaAgent)
 
   // Execution Pool for Processing Data, these allow agents to perform long-running
@@ -259,7 +266,9 @@ class SiaAgent extends AiraAgent  {
 
     // SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
     // to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
-    slic.getSegments(reservoirMatrix)
+    val segments: INDArray = new SLIC(
+      reservoirMatrix,
+      (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)).segments()
 
     META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 
@@ -287,8 +296,8 @@ class SiaAgent extends AiraAgent  {
 
     // main reservoir matrix that holds our data, 4-dimensional array with the 4th dimension holding values
     // The 4th dimension is an array holding properties of reservoirs coming from raw data.
-    // NOTE: 2019-04-26 - The 4th dimension is only of length 1 for now as we only use Permeability X
-    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 1)
+    // TODO: Introduce the 4th dimension with only length 1 to hold more than one feature
+    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
 
     // Create a buffered source to the voi res file, we do this because there is no need to load
     // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
@@ -305,7 +314,10 @@ class SiaAgent extends AiraAgent  {
       readResult match {
         // Right side of read result is our actual value, IF everything went well reading it
         case Right(voiRes) => {
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.permX)
+          // TODO: Instead of storing only PERMEABILITY-X, take all features and combine into one
+          //  or turn the matrix into a 4-dimensional matrix and store all features in 4th dim,
+          //  but that would mean the segmentation algorithm needs changing
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
         }
         // Left side of read result is the error, IF something went bad
         case Left(error) => {

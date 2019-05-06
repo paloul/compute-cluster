@@ -43,6 +43,8 @@ class ShardedAgents extends Actor with ActorLogging {
     ShardedGeoDynamicAgent.extractShardId
   )
 
+  // Call configure to first initiate any custom config for Sia objects
+  SiaAgent.configure() // i.e. underlying nd4j library
   // Start the cluster shard system and manager for the Sia agents
   val shardedSiaAgents: ActorRef = ClusterSharding(context.system).start(
     ShardedSiaAgent.shardName,
