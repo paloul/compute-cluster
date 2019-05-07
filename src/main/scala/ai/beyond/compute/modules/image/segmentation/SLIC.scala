@@ -55,7 +55,6 @@ class SLIC (
     initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize),
     3)
 
-
   /**
     * Main entry point to get segments of matrix. The only public function on this class.
     * @return An ND4J INDArray representing the world with cluster labels at each voxel point
@@ -76,7 +75,6 @@ class SLIC (
     // list.forall(identity) will fail on first instance of FALSE
     if (checks.forall(identity)) {
 
-      // TODO: Do stuff here
       calcClusterAssignments()
 
     } else {
@@ -186,6 +184,8 @@ class SLIC (
     * @return 3D INDArray of integers indicating segment labels
     */
   private def calcClusterAssignments (): INDArray = {
+
+    // TODO: Do stuff here
 
     // Return the clusterAssignments matrix. Cluster Assignments is a matrix of same
     // dimensions and size of the original provided matrix. But the scalar values

@@ -25,6 +25,8 @@ import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 
 object SiaAgent extends ShardedMessages {
+  // This does a couple things... first the obvious it sets data type for matrices to Float.
+  // Second, it allows to load ND4J during application start so that agents dont waste time
   def configure() = {
     Nd4j.setDataType(DataBuffer.Type.FLOAT)
   }
@@ -252,9 +254,9 @@ class SiaAgent extends AiraAgent  {
     * @param id
     * @return A Future with MetaProps about the job
     */
-  def startProcessing(id: String): Future[MetaProps] = Future {
+  def startProcessing(id: String): Future[Unit] = Future {
     // Change our behavior state to running in order to treat incoming messages differently
-    //become(running)
+    become(running)
 
     META_PROPS.lastKnownStage = "startProcessing(id: String)"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
@@ -264,17 +266,16 @@ class SiaAgent extends AiraAgent  {
     // background processes, as they will not stop regular agent functionality
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
-    // SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
-    // to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
+    // TODO: Make it a 4D matrix and insert additional data properties. 2019-05-07 only 3D matrix
+    //  SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
+    //  to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
         (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
       ).segments()
     })
-
-    META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
-
+    
   }(procExecutionContext)
   //------------------------------------------------------------------------//
   // End Helper Future Wrapped Functions
