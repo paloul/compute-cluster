@@ -3,7 +3,8 @@ package ai.beyond.compute.modules.image.segmentation
 
 import org.nd4j.linalg.api.ndarray._
 import org.nd4j.linalg.factory.Nd4j
-import org.nd4j.linalg.indexing.NDArrayIndex
+
+import scala.collection.parallel.mutable.ParArray
 
 
 class SLIC (
@@ -41,10 +42,18 @@ class SLIC (
   private val compactness: Float =
     if (superPixelSize == Float.MinValue) superPixelSize else _compactness
 
+  // Defined in SLIC implementation paper
+  val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
+
   // Create a new ND4j matrix of 3 dimensions the same shape as matrix, fill
   // it with -5 values as initial cluster values, i.e. -5 means no cluster assigned
   private val clusterAssignments: INDArray =
     Nd4j.valueArrayOf(Array(xDimSize, yDimSize, zDimSize), -5f)
+
+  // Initialize starting super centers
+  val centerCoords = adjustSuperCentersToLowContrast(
+    initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize),
+    3)
 
 
   /**
@@ -53,7 +62,7 @@ class SLIC (
     */
   def segments (): INDArray = {
 
-    log.info("Starting SLIC...")
+    log.info("Starting segmentation process...")
 
     // Introduce any checks here, add the functions calls to the list
     // Each function call will be evaluated and results stored in checks list
@@ -68,7 +77,7 @@ class SLIC (
     if (checks.forall(identity)) {
 
       // TODO: Do stuff here
-      calculate()
+      calcClusterAssignments()
 
     } else {
       // If any checks failed then reply back with empty INDArray
@@ -84,8 +93,11 @@ class SLIC (
     * @return Array of Int tuples, representing (x,y,z)
     */
   private def initSuperCenters(dims: (Int, Int, Int),
-                               gridInterval: Int): Array[(Int, Int, Int)] = {
-    import scala.math._
+                               gridInterval: Int): ParArray[(Int, Int, Int)] = {
+    import scala.math.floor
+    import scala.math.round
+
+    log.info("Initializing Super Centers...")
 
     // x -> tuple._1
     // y -> tuple._2
@@ -98,12 +110,12 @@ class SLIC (
     val out = for {
       x_s <- xStart until dims._1 by gridInterval;
       y_s <- yStart until dims._2 by gridInterval;
-      z_s <- zStart until dims._3 by gridInterval;
+      z_s <- zStart until dims._3 by gridInterval
     } yield {
       (x_s, y_s, z_s)
     }
 
-    out.toArray
+    out.toArray.par
   }
 
   /**
@@ -114,8 +126,8 @@ class SLIC (
     * @return Modified list of Centers as [(int, int, int)]
     */
   private def adjustSuperCentersToLowContrast(
-                               centers: Array[(Int, Int, Int)],
-                               adjustBy: Int = 3): Array[(Int, Int, Int)] = {
+                               centers: ParArray[(Int, Int, Int)],
+                               adjustBy: Int = 3): ParArray[(Int, Int, Int)] = {
 
     log.info("Adjusting Super Centers to Low Contrast...")
     centers.map(c => {
@@ -126,28 +138,20 @@ class SLIC (
       var maxScore: Float = 0.0f
       var bestMove: (Int, Int, Int) = (0, 0, 0)
 
-      // Pull out a slice of the main array around the current center point, this is
-      // returned as a view of the original matrix. Modifications to values effects original
-      val matrixAroundCenterPoint: INDArray = matrix.get(
-        NDArrayIndex.interval(xC - adjustBy, xC + adjustBy),
-        NDArrayIndex.interval(yC - adjustBy, yC + adjustBy),
-        NDArrayIndex.interval(zC - adjustBy, zC + adjustBy)
-      )
-
       // Get all other points surrounding each center -adjustBy to adjustBy out
       for {
 
         dx <- (-adjustBy) until adjustBy;
         dy <- (-adjustBy) until adjustBy;
-        dz <- (-adjustBy) until adjustBy;
+        dz <- (-adjustBy) until adjustBy
 
       } {
 
         // Retrieve scalar value from matrix given points around the center and determine
         // if its the best move to make.
         // TODO: This can be improved as retrieve of scalar values from matrix via getFloat()
-        //  and indices is slow. If we can retrieve parts of the matrix and execute on it,
-        //  computation should be faster
+        //  and indices is slow as your are bringing in floats outside JVM into JVM.
+        //  If we can retrieve parts of the matrix and execute on it, computation should be faster
         if (checkBounds((xC + dx, yC + dy, zC + dz), (xDimSize, yDimSize, zDimSize))) {
           var difSum: Float = 0.0f
           val currValue: Float = matrix.getFloat(Array(xC + dx, yC + dy, zC + dz))
@@ -181,7 +185,7 @@ class SLIC (
     * The main private function that does the SLIC algorithm
     * @return 3D INDArray of integers indicating segment labels
     */
-  private def calculate (): INDArray = {
+  private def calcClusterAssignments (): INDArray = {
 
     // Return the clusterAssignments matrix. Cluster Assignments is a matrix of same
     // dimensions and size of the original provided matrix. But the scalar values

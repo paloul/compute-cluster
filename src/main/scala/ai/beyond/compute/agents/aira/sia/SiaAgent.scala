@@ -33,7 +33,7 @@ object SiaAgent extends ShardedMessages {
 
   // Execution Pool for Processing Data, these allow agents to perform long-running
   // tasks on a different thread pool separate from main message handler
-  private val procExecutorService = Executors.newFixedThreadPool(6 )
+  private val procExecutorService = Executors.newFixedThreadPool(8 )
   private val procExecutionContext = ExecutionContext.fromExecutorService(procExecutorService)
 
   // Create the catch Message type for this agent
@@ -254,7 +254,7 @@ class SiaAgent extends AiraAgent  {
     */
   def startProcessing(id: String): Future[MetaProps] = Future {
     // Change our behavior state to running in order to treat incoming messages differently
-    become(running)
+    //become(running)
 
     META_PROPS.lastKnownStage = "startProcessing(id: String)"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
@@ -266,9 +266,12 @@ class SiaAgent extends AiraAgent  {
 
     // SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
     // to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
-    val segments: INDArray = new SLIC(
-      reservoirMatrix,
-      (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)).segments()
+    val segments: INDArray = time ("Initiate SLIC and get Segments", {
+      new SLIC(
+        reservoirMatrix,
+        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+      ).segments()
+    })
 
     META_PROPS // Return the META_PROPS instance that we store metadata about Sia jobs
 
