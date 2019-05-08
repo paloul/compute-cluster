@@ -5,6 +5,8 @@ import java.util.Properties
 import scala.concurrent.duration._
 import akka.actor._
 import com.typesafe.config.Config
+import org.nd4j.linalg.api.buffer.DataBuffer
+import org.nd4j.linalg.factory.Nd4j
 
 /**
   * This companion object here should not be touched, its basic infrastructure support
@@ -39,6 +41,8 @@ object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
 class Settings(config: Config) extends Extension {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
+
+  Nd4j.setDataType(DataBuffer.Type.FLOAT)
 
   // Holds config params from application.conf concerning hdfs
   object hdfs {

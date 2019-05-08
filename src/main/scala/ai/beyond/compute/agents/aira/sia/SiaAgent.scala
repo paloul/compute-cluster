@@ -20,22 +20,15 @@ import ai.beyond.compute.modules.image.segmentation.SLIC
 import concurrent.ExecutionContext
 import kantan.csv._
 import kantan.csv.ops._
-import org.nd4j.linalg.api.buffer.DataBuffer
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 
 object SiaAgent extends ShardedMessages {
-  // This does a couple things... first the obvious it sets data type for matrices to Float.
-  // Second, it allows to load ND4J during application start so that agents dont waste time
-  def configure() = {
-    Nd4j.setDataType(DataBuffer.Type.FLOAT)
-  }
-
   def props(agentId: String) = Props(new SiaAgent)
 
   // Execution Pool for Processing Data, these allow agents to perform long-running
   // tasks on a different thread pool separate from main message handler
-  private val procExecutorService = Executors.newFixedThreadPool(8 )
+  private val procExecutorService = Executors.newFixedThreadPool(6 )
   private val procExecutionContext = ExecutionContext.fromExecutorService(procExecutorService)
 
   // Create the catch Message type for this agent
@@ -251,12 +244,12 @@ class SiaAgent extends AiraAgent  {
   /**
     * Helper function to start long running data processing with an Execution Context
     * in possession of a separate thread pool.
-    * @param id
+    * @param id id of the agent
     * @return A Future with MetaProps about the job
     */
-  def startProcessing(id: String): Future[Unit] = Future {
+  def startProcessing(id: String): Future[MetaProps] = Future {
     // Change our behavior state to running in order to treat incoming messages differently
-    become(running)
+    //become(running)
 
     META_PROPS.lastKnownStage = "startProcessing(id: String)"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
@@ -266,16 +259,16 @@ class SiaAgent extends AiraAgent  {
     // background processes, as they will not stop regular agent functionality
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
-    // TODO: Make it a 4D matrix and insert additional data properties. 2019-05-07 only 3D matrix
-    //  SLIC.getSegments expects a 4-dimensional matrix. This SLIC is very specific
-    //  to the needs of Sia Agent. A 3d matrix with the 4th dimension holding feature property values
+    // Pass in a 4-dimensional array into SLIC. Fourth dimension contains properties
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
-        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2)
       ).segments()
     })
-    
+
+    META_PROPS
+
   }(procExecutionContext)
   //------------------------------------------------------------------------//
   // End Helper Future Wrapped Functions
@@ -300,8 +293,11 @@ class SiaAgent extends AiraAgent  {
 
     // main reservoir matrix that holds our data, 4-dimensional array with the 4th dimension holding values
     // The 4th dimension is an array holding properties of reservoirs coming from raw data.
-    // TODO: Introduce the 4th dimension with only length 1 to hold more than one feature
-    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ)
+    // NOTE: Fourth dimension is size 2. Storing and working with PERM-X and PERM-Z
+    //  Eventually will want to add more features to the fourth dimension. SLIC should
+    //  be able to calculate distance regardless of number of features
+    val reservoirMatrix = Nd4j.valueArrayOf(
+      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2), Float.NaN)
 
     // Create a buffered source to the voi res file, we do this because there is no need to load
     // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
@@ -314,14 +310,13 @@ class SiaAgent extends AiraAgent  {
     //val voiFaultIterator = voiFaultFile.asCsvReader[VoiFault](rfc.withHeader)
 
     // Read Result is of type Either - https://www.scala-lang.org/api/current/scala/util/Either.html
-    voiResIterator.foreach( readResult => {
-      readResult match {
+    voiResIterator.foreach(
+      {
         // Right side of read result is our actual value, IF everything went well reading it
         case Right(voiRes) => {
-          // TODO: Instead of storing only PERMEABILITY-X, take all features and combine into one
-          //  or turn the matrix into a 4-dimensional matrix and store all features in 4th dim,
-          //  but that would mean the segmentation algorithm needs changing
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz), voiRes.permX)
+          // Storing as [PERM-X, PERM-Z] in the fourth dimension
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.permX)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.permZ)
         }
         // Left side of read result is the error, IF something went bad
         case Left(error) => {
@@ -329,7 +324,7 @@ class SiaAgent extends AiraAgent  {
           log.error(error.getMessage)
         }
       }
-    })
+    )
 
     /*voiFaultIterator.foreach( readResult => {
       readResult match {
