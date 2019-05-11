@@ -45,21 +45,17 @@ class SLIC (
     if (superPixelSize == Float.MinValue) superPixelSize else _compactness
 
   // Defined in SLIC implementation paper
-  val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
+  private val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
 
-  // Create a new ND4j matrix of 3 dimensions the same shape as matrix, fill
-  // it with -5 values as initial cluster values, i.e. -5 means no cluster assigned
-  private val clusterAssignments: INDArray =
-    Nd4j.valueArrayOf(Array(xDimSize, yDimSize, zDimSize), -5f)
-
-  // Initialize starting super centers
-  val centerCoords = initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize)
+  // Starting Super Center coordinates. Initialized in main segments function
+  private var centerCoords: ParArray[(Int,Int,Int)] = _
 
   /**
     * Main entry point to get segments of matrix. The only public function on this class.
+    * @param clusters The INDArray of same size as input value matrix to hold cluster labels
     * @return An ND4J INDArray representing the world with cluster labels at each voxel point
     */
-  def segments (): INDArray = {
+  def segments (clusters: INDArray): INDArray = {
 
     log.info("Starting segmentation process...")
 
@@ -67,7 +63,8 @@ class SLIC (
     // Each function call will be evaluated and results stored in checks list
     val checks = List[Boolean](
       checkDimensions(),
-      checkDimensionSizes()
+      checkDimensionSizes(),
+      verifyValueAndClustersMatrixSizes(matrix.shape(), clusters.shape())
     )
 
     // Loop through the checks list and make sure everything passed
@@ -75,11 +72,19 @@ class SLIC (
     // list.forall(identity) will fail on first instance of FALSE
     if (checks.forall(identity)) {
 
-      calcClusterAssignments()
+      // init the beginning super centers
+      centerCoords = initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize)
+
+      // Calculate clusters and return the same INDArray that was given to us
+      // to store the cluster labels
+      calculateClusters(clusters)
 
     } else {
       // If any checks failed then reply back with empty INDArray
-      log.error("SLIC Parameter Checks failed. Stopping.")
+      log.error("SLIC Parameter Checks failed. Stopping and cleaning up.")
+      // Cleanup the original clusters matrix that was given to us
+      clusters.cleanup()
+      // Return an empty nd4j indarray to mark failure
       Nd4j.empty()
     }
   }
@@ -113,6 +118,8 @@ class SLIC (
       (x_s, y_s, z_s)
     }
 
+    log.info("Super Centers Initialized")
+
     out.toArray.par
   }
 
@@ -134,7 +141,7 @@ class SLIC (
       val yC: Int = c._2
       val zC: Int = c._3
 
-      var maxScore: Float = 0.0f
+      var maxScore: Double = 0.0f
       var bestMove: (Int, Int, Int) = (0, 0, 0)
 
       // Get all other points surrounding each center -adjustBy to adjustBy out
@@ -149,7 +156,7 @@ class SLIC (
         // Retrieve scalar value from matrix given points around the center and determine
         // if its the best move to make.
         if (checkBounds((xC + dx, yC + dy, zC + dz), (xDimSize, yDimSize, zDimSize))) {
-          var difSum: Float = 0.0f
+          var difSum: Double = 0.0
 
           // This should give us the vector stored in the 4th dimension
           // Addition of c+d so that we get the point around the center
@@ -208,16 +215,24 @@ class SLIC (
     * @return The distance of point from center of cluster as Float
     */
   private def pointDistanceFromCluster(point: (Int, Int, Int), ci: Int): Double = {
+    val center = centerCoords(ci)
 
-    // Get the Center Coordinate x.y.z values and the feature vector from the source matrix
-    val c = centerCoords(ci)
-    val xC: Int = c._1
-    val yC: Int = c._2
-    val zC: Int = c._3
+    pointDistanceFromCluster(point, center)
+  }
+
+  /**
+    * Compute the distance of given point to the center of a cluster
+    * @param point The point in space comparing to a center
+    * @param center The center tuple point from our center coords
+    * @return The distance of point from center of cluster as Float
+    */
+  private def pointDistanceFromCluster(point: (Int, Int, Int), center: (Int, Int, Int)): Double = {
+
+    // Get the Center Coordinate the feature vector from the source matrix
     val centerFeaturesVector = matrix.get(
-      NDArrayIndex.point(xC),
-      NDArrayIndex.point(yC),
-      NDArrayIndex.point(zC),
+      NDArrayIndex.point(center._1),
+      NDArrayIndex.point(center._2),
+      NDArrayIndex.point(center._3),
       NDArrayIndex.all())
 
     // Get the features for the point from the source matrix
@@ -228,7 +243,7 @@ class SLIC (
       NDArrayIndex.all())
 
     // Calculate the distances of space and features. Use of ivtwt coming from SLIC implementation
-    val distSpace = distanceFunction(point, c) * ivtwt
+    val distSpace = distanceFunction(point, center) * ivtwt
     val distFeatures = distanceFunction(centerFeaturesVector, pointFeaturesVector)
 
     // Return the distance calculations
@@ -237,16 +252,79 @@ class SLIC (
 
   /**
     * The main private function that does the SLIC algorithm
+    * @param clusters The INDArray of same size as input value matrix to hold cluster labels
     * @return 3D INDArray of integers indicating segment labels
     */
-  private def calcClusterAssignments (): INDArray = {
+  private def calculateClusters (clusters: INDArray): INDArray = {
 
-    // TODO: Do stuff here
+    log.info("Calculating Clusters...")
 
-    // Return the clusterAssignments matrix. Cluster Assignments is a matrix of same
+    // Initiate variables that are used in algorithm
+    val dims = (xDimSize, yDimSize, zDimSize)
+    val lastKnownDistanceOfPointFromCenter = Nd4j.valueArrayOf(
+      Array(xDimSize, yDimSize, zDimSize), Float.MaxValue)
+
+    var otherHalt = 0
+    var lastChange = Double.MaxValue
+
+    var once = true
+
+    //while (otherHalt < maxIteration & lastChange > minChangePerIteration) {
+    while(once) {
+
+      once = false
+
+      (0 until centerCoords.size).toList.par.map { cIndex =>
+
+        // Get the current center point
+        val center: (Int, Int, Int) = centerCoords(cIndex)
+
+        for (
+
+          xVoxel <- center._1 - 2 * superPixelSize until center._1 + 2 * superPixelSize;
+          yVoxel <- center._2 - 2 * superPixelSize until center._2 + 2 * superPixelSize;
+          zVoxel <- center._3 - 2 * superPixelSize until center._3 + 2 * superPixelSize
+
+        ) {
+
+          // Create the voxel as a tuple
+          val voxelTuple = (xVoxel, yVoxel, zVoxel)
+          val voxelArray = Array(xVoxel, yVoxel, zVoxel)
+
+          // Check if voxel is in bounds before doing anything else
+          if (checkBounds(voxelTuple, dims)) {
+
+            // Calculate distance (features and space) of point from center of cluster
+            val curVoxelDist = pointDistanceFromCluster(voxelTuple, center)
+            val lastDistance =
+              lastKnownDistanceOfPointFromCenter.getFloat(voxelArray)
+            if(lastDistance > curVoxelDist) {
+
+              lastKnownDistanceOfPointFromCenter.putScalar(voxelArray, curVoxelDist)
+              clusters.putScalar(voxelArray, cIndex)
+
+            }
+
+          }
+
+        }
+
+
+
+      }
+
+    }
+
+    // cleanup the last known array
+    lastKnownDistanceOfPointFromCenter.cleanup()
+
+    // Return the clusters matrix. Cluster Assignments is a matrix of same
     // dimensions and size of the original provided matrix. But the scalar values
     // represent a label of each cluster the voxel point was associated with.
-    clusterAssignments
+    // The clusters matrix is provided by the caller of this class as the caller
+    // needs to make use of the matrix to identify and process clusters further.
+    // That way they can destroy the matrix when appropriate instead of this class.
+    clusters
   }
 
   /**
@@ -263,15 +341,11 @@ class SLIC (
   }
 
   /**
-    * Defines how to calculate the distance between two datapoints. Since we are working with just
-    * one floating point scalar here, this is simply the absolute value of the difference between
-    * the two floats. If for instance, we were dealing with a (int, int, int) or (float, float, float)
-    * as the value at each voxel point then we would need a much more involved distance func here.
-    * For example, if we had (float,float,float) representing RGB values, the following would be
-    * sqrt(pow(r1-r2,2) + pow(g1-g2,2) + pow(b1-b2,2))
+    * Calculates and returns distance given two INDArrays from nd4j. Utilizes
+    * distance function from nd4j library
     * @param x First INDArray
     * @param y Second INDArray
-    * @return Float value of distance between the two indarrays
+    * @return Float value of distance between the two INDArrays
     */
   private def distanceFunction(x:INDArray, y:INDArray): Double = {
 
@@ -330,9 +404,9 @@ class SLIC (
     * @return
     */
   private def checkDimensionSizes(): Boolean = {
-    if (matrix.shape().apply(0) == xDimSize &&
-        matrix.shape().apply(1) == yDimSize &&
-        matrix.shape().apply(2) == zDimSize) {
+    if ((xDimSize > 0 && matrix.shape().apply(0) == xDimSize) &&
+        (yDimSize > 0 && matrix.shape().apply(1) == yDimSize) &&
+        (zDimSize > 0 && matrix.shape().apply(2) == zDimSize)) {
       true
     } else {
       log.warning("Matrix shape does not match provided" +
@@ -341,5 +415,30 @@ class SLIC (
         "["+xDimSize+","+yDimSize+","+zDimSize+","+sDimSize+"]")
       false
     }
+  }
+
+  /**
+    * Compares the sizes of the value matrix and the clusters matrix provided as they
+    * need to match in dimensions and sizes
+    * @param matrix 4-dimensional NDArray holding values
+    * @param clusters 3-dimensional INDArray holding cluster labels
+    * @return
+    */
+  private def verifyValueAndClustersMatrixSizes(
+                   matrix: Array[Long], clusters: Array[Long]): Boolean = {
+
+    // x.y.z sizes need to match only, ignore 4th dimension of matrix
+    if (matrix.apply(0) == clusters.apply(0) &&
+      matrix.apply(1) == clusters.apply(1) &&
+      matrix.apply(2) == clusters.apply(2)) {
+      true
+    } else {
+      log.warning("Matrix and Clusters shape do not match" +
+        "Matrix has Shape:[{}], while Clusters has [{}]",
+        matrix.mkString(","),
+        clusters.mkString(","))
+      false
+    }
+
   }
 }

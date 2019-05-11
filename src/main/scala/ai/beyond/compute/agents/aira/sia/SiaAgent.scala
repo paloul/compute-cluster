@@ -259,13 +259,19 @@ class SiaAgent extends AiraAgent  {
     // background processes, as they will not stop regular agent functionality
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
-    // Pass in a 4-dimensional array into SLIC. Fourth dimension contains properties
+    // Pass in a 4-dimensional array into SLIC. Fourth dimension contains properties/features
+    // Create a 3-dimensional INDArray (matrix) of same size minus 4th dim to hold cluster labels
+    // This is passed into SLIC.segments and used when it calculates and stores labels
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
         (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2)
-      ).segments()
+      ).segments(Nd4j.valueArrayOf(
+        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ), -5f))
     })
+
+    META_PROPS.lastKnownStage = "SLIC.Segments()"
+    META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
 
     META_PROPS
 
