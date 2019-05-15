@@ -2,6 +2,8 @@ name := "ai.beyond.compute-cluster"
 
 organization := "ai.beyond"
 
+maintainer := "gpaloulian@beyond.ai"
+
 version := "0.0.1"
 
 scalaVersion := "2.11.12"
@@ -66,14 +68,23 @@ libraryDependencies ++= {
 
     // https://deeplearning4j.org/docs/latest/deeplearning4j-config-buildtools
     "org.deeplearning4j" % "deeplearning4j-core" % nd4jVersion,
-    "org.nd4j" % "nd4j-native-platform" % nd4jVersion,
-    "org.nd4j" % "nd4j-native" % nd4jVersion
+    "org.nd4j" % "nd4j-native-platform" % nd4jVersion
   )
 }
+
 
 // Settings for the docker image to be built
 // Look into Docker support for sbt-native-packager
 // To build the docker image: sbt docker:publishLocal
+/*
+universal:packageBin - Generates a universal zip file
+universal:packageZipTarball - Generates a universal tgz file
+debian:packageBin - Generates a deb
+docker:publishLocal - Builds a Docker image using the local Docker server
+rpm:packageBin - Generates an rpm
+universal:packageOsxDmg - Generates a DMG file with the same contents as the universal zip/tgz.
+windows:packageBin - Generates an MSI
+ */
 packageName in Docker := name.value
 version in Docker := version.value
 dockerBaseImage := "openjdk:8-stretch"

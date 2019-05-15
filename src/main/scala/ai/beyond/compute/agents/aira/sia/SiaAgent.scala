@@ -265,7 +265,7 @@ class SiaAgent extends AiraAgent  {
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
-        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2)
+        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 5)
       ).segments(Nd4j.valueArrayOf(
         Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ), -5f))
     })
@@ -303,7 +303,7 @@ class SiaAgent extends AiraAgent  {
     //  Eventually will want to add more features to the fourth dimension. SLIC should
     //  be able to calculate distance regardless of number of features
     val reservoirMatrix = Nd4j.valueArrayOf(
-      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2), Float.NaN)
+      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 5), Float.NaN)
 
     // Create a buffered source to the voi res file, we do this because there is no need to load
     // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
@@ -320,9 +320,12 @@ class SiaAgent extends AiraAgent  {
       {
         // Right side of read result is our actual value, IF everything went well reading it
         case Right(voiRes) => {
-          // Storing as [PERM-X, PERM-Z] in the fourth dimension
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.permX)
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.permZ)
+          // Storing as [NX,NY,NZ,PERM-X,PERM-Z] in the fourth dimension
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.nx)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.ny)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 2), voiRes.nz)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 3), voiRes.permX)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
         }
         // Left side of read result is the error, IF something went bad
         case Left(error) => {
