@@ -5,7 +5,7 @@ import java.util.Properties
 import scala.concurrent.duration._
 import akka.actor._
 import com.typesafe.config.Config
-import org.nd4j.linalg.api.buffer.DataBuffer
+import org.nd4j.linalg.api.buffer.{DataBuffer, DataType}
 import org.nd4j.linalg.factory.Nd4j
 
 /**
@@ -42,7 +42,7 @@ class Settings(config: Config) extends Extension {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
 
-  Nd4j.setDataType(DataBuffer.Type.FLOAT)
+  Nd4j.setDefaultDataTypes(DataType.FLOAT, DataType.FLOAT)
 
   // Holds config params from application.conf concerning hdfs
   object hdfs {
