@@ -20,6 +20,7 @@ import ai.beyond.compute.modules.image.segmentation.SLIC
 import concurrent.ExecutionContext
 import kantan.csv._
 import kantan.csv.ops._
+import org.nd4j.linalg.api.buffer.DataType
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 
@@ -198,6 +199,8 @@ class SiaAgent extends AiraAgent  {
 
       // Provided parameters were ok at this point, let's start processing
       startProcessing(id)
+
+      become(running) // become running state to handle different context
   }
 
   // Computing behavior state
@@ -209,7 +212,8 @@ class SiaAgent extends AiraAgent  {
     case CompleteJob(id) =>
       log.info("Finalizing the Sia Job [{}] and marking completion", id)
       // TODO: Mark completion, whatever that means
-      become(completed)
+      // Shut down this agent, its done
+      context.parent ! Passivate(stopMessage = SiaAgent.Stop)
 
     case CancelJob(id) =>
       log.info("Cancelling the Sia Job [{}]", id)
@@ -267,11 +271,14 @@ class SiaAgent extends AiraAgent  {
         reservoirMatrix,
         (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 5)
       ).segments(Nd4j.valueArrayOf(
-        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ), -5f))
+        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2), -5))
     })
 
     META_PROPS.lastKnownStage = "SLIC.Segments()"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
+
+    // Send yourself a complete job message, we are done
+    self ! SiaAgent.CompleteJob(id)
 
     META_PROPS
 

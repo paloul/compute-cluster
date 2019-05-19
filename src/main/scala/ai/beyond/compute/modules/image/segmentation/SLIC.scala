@@ -1,7 +1,5 @@
 package ai.beyond.compute.modules.image.segmentation
 
-
-import org.nd4j.linalg.api.buffer.DataBuffer
 import org.nd4j.linalg.api.ndarray._
 import org.nd4j.linalg.factory.Nd4j
 import org.nd4j.linalg.indexing.NDArrayIndex
@@ -14,7 +12,7 @@ class SLIC (
              dimensions: (Int, Int, Int, Int),
              superPixelSize: Int = 30,
              _compactness: Float = Float.MinValue,
-             maxIteration: Int = 10,
+             maxIteration: Int = 5,
              minChangePerIteration: Float = 0.00001f,
              clusterNormalization: Boolean = false,
              _minSuperSize: Int = -1
@@ -52,6 +50,10 @@ class SLIC (
   private val centerCoords: ParArray[((Int, Int, Int), Int)] =
     initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize)
 
+  // Create a new matrix to hold distance values of each point to a center
+  private val storedDistanceMatrix: INDArray = Nd4j.valueArrayOf(
+    Array(xDimSize, yDimSize, zDimSize), Float.MaxValue)
+
   /**
     * Main entry point to get segments of matrix. The only public function on this class.
     * @param clusters The INDArray of same size as input value matrix to hold cluster labels
@@ -79,7 +81,9 @@ class SLIC (
         // Calculate clusters and return the same INDArray that was given to us
         // to store the cluster labels
         calculateClusters(clusters)
+
       } catch {
+
         case e: Exception =>
           log.error(e.getMessage)
           // Cleanup the original clusters matrix that was given to us
@@ -260,22 +264,16 @@ class SLIC (
 
     log.info("Calculating Clusters...")
 
-    // Initiate variables that are used in algorithm
-    val lastKnownDistanceOfPointFromCenter = Nd4j.valueArrayOf(
-      Array(xDimSize, yDimSize, zDimSize), Float.MaxValue)
+    var rounds: Int = 0
+    var anyChange: Boolean = false
 
-    var otherHalt = 0
-    var lastChange = Double.MaxValue
+    while (!anyChange && rounds < maxIteration) {
 
-    var once = true
-
-    //while (otherHalt < maxIteration & lastChange > minChangePerIteration) {
-    while(once) {
-
-      once = false
+      anyChange = false // reset the any change bit
 
       // Use the indices of the centers to retrieve them,
-      // since we use the center index as the cluster label index
+      // since we use the center index as the cluster label index.
+      // Basically this goes through and assigns voxels to clusters
       val t0_clusterAssign = System.nanoTime()
       centerCoords.foreach { case(c, ci) =>
 
@@ -335,22 +333,61 @@ class SLIC (
         // Calculate the distances of coordinates and features. This will give us a matrix
         // of shape (xEnd-xStart, yEnd-yStart, zEnd-zStart)
         // calculate the distance of coords with center. multiply by ivtwt is a SLIC implementation
-        val distanceCoord = sqrt(pow(subCoords, 2).sum(3)).mul(ivtwt)
+        val distanceCoord = sqrt(pow(subCoords, 2).sum(3)).muli(ivtwt)
         // calculate the distance of coords with center
         val distanceFeatures = sqrt(pow(subFeatures, 2).sum(3))
 
+        // Add the distance measurements for coordinate space and feature together for each voxel
+        val calculatedDistances = distanceCoord.add(distanceFeatures) // Add returns new matrix
+
+        // Get the current slice of voxels from storedDistanceMatrix which holds distances
+        // for the complete larger matrix provided at creation
+        val storedDistances = storedDistanceMatrix.get(
+          NDArrayIndex.interval(xStart, xEnd),
+          NDArrayIndex.interval(yStart, yEnd),
+          NDArrayIndex.interval(zStart, zEnd)
+        )
+
+        // Get a view into the cluster matrix where we store cluster labels.
+        // Getting a view will focus the area and give us a subset of the larger matrix
+        // of the current voxels that we are computing over
+        val clusterAssignment = clusters.get(
+          NDArrayIndex.interval(xStart, xEnd),
+          NDArrayIndex.interval(yStart, yEnd),
+          NDArrayIndex.interval(zStart, zEnd)
+        )
 
 
+        // Loop through the calculated distances and check if the distance
+        // is smaller to the current cluster center than its previous recorded distance.
+        // The lengths of calculatedDistances, storedDistances, and clusterAssignment
+        // are of the same length, as we get views into the larger underlying matrix
+        // TODO: Make this faster somehow using matrix ND4j calls
+        for (i <- 0L until calculatedDistances.length()) {
+
+          //Get values out of their respective matrices
+          val storedDistance = storedDistances.getFloat(i)
+          val calculatedDistance = calculatedDistances.getFloat(i)
+
+          // Check if stored is greater than calculated, if it is then we found
+          // a new center for this voxel. Set its information to storedDistance and cluster labels
+          if (calculatedDistance < storedDistance) {
+            storedDistances.putScalar(i, calculatedDistance)
+            clusterAssignment.putScalar(i, ci)
+
+            anyChange = true // record the fact that a voxel received a new cluster assignment
+          }
+        }
       }
+
+      // Increment the round counter
+      rounds += 1
+
       val t1_clusterAssign = System.nanoTime()
-      log.info("A round of cluster assignment elapsed time: {} (s)",
+      log.info("Round [{}] cluster assignment time [{} (s)]",
+        rounds,
         (t1_clusterAssign - t0_clusterAssign) / 1E9)
-
-      // TODO: Continue Here
     }
-
-    // cleanup the last known array
-    lastKnownDistanceOfPointFromCenter.close()
 
     // Return the clusters matrix. Cluster Assignments is a matrix of same
     // dimensions and size of the original provided matrix. But the scalar values
@@ -452,8 +489,8 @@ class SLIC (
   /**
     * Compares the sizes of the value matrix and the clusters matrix provided as they
     * need to match in dimensions and sizes
-    * @param matrix 4-dimensional NDArray holding values
-    * @param clusters 3-dimensional INDArray holding cluster labels
+    * @param matrix 4-dimensional NDArray holding feature values
+    * @param clusters 4-dimensional INDArray holding cluster labels and distance
     * @return
     */
   private def verifyValueAndClustersMatrixSizes(
