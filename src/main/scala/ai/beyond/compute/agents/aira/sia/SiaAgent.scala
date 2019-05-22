@@ -20,7 +20,6 @@ import ai.beyond.compute.modules.image.segmentation.SLIC
 import concurrent.ExecutionContext
 import kantan.csv._
 import kantan.csv.ops._
-import org.nd4j.linalg.api.buffer.DataType
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 
@@ -269,10 +268,13 @@ class SiaAgent extends AiraAgent  {
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
-        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 5)
+        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6)
       ).segments(Nd4j.valueArrayOf(
-        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 2), -5))
+        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ), -1))
     })
+
+    // Write out segments as npy array to file
+    Nd4j.writeAsNumpy(segments, new File(BASE_FILE_PATH + META_PROPS.voiResFileName + "-Out-" + id + ".npy"))
 
     META_PROPS.lastKnownStage = "SLIC.Segments()"
     META_PROPS.lastKnownUpdate = Instant.now().getEpochSecond
@@ -308,7 +310,7 @@ class SiaAgent extends AiraAgent  {
     // The 4th dimension is an array holding properties of reservoirs coming from raw data.
     // NOTE: Fourth dimension is size >3. Storing and working with PERM-X and PERM-Z.
     //  The first three values in the fourth dimension are the x.y.z index values
-    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 5)
+    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6)
 
     // Loop through matrix and assign voxel indices to vector 0,1,2
     for (
@@ -342,6 +344,7 @@ class SiaAgent extends AiraAgent  {
 //          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 2), voiRes.nz)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 3), voiRes.permX)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 5), voiRes.porosity)
         }
         // Left side of read result is the error, IF something went bad
         case Left(error) => {
