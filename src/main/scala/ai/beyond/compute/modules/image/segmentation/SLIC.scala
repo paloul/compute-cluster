@@ -1,8 +1,10 @@
 package ai.beyond.compute.modules.image.segmentation
 
+import org.nd4j.linalg.api.buffer.DataType
 import org.nd4j.linalg.api.ndarray._
 import org.nd4j.linalg.factory.Nd4j
-import org.nd4j.linalg.indexing.NDArrayIndex
+import org.nd4j.linalg.indexing.conditions._
+import org.nd4j.linalg.indexing.{BooleanIndexing, NDArrayIndex}
 
 import scala.collection.parallel.mutable.ParArray
 
@@ -10,10 +12,11 @@ import scala.collection.parallel.mutable.ParArray
 class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
-       superPixelSize: Int = 50,
+       superPixelSize: Int = 22,
        compactness: Float = 10f,
-       maxIteration: Int = 3,
-       minSuperSize: Int = 1
+       maxIteration: Int = 2,
+       minSuperSize: Int = 1,
+       centerDelta: (Float, Float, Float) = (2.25f, 2.25f, 2.25f)
     ) (implicit logger: akka.event.LoggingAdapter) {
 
   // Cache the logger provided implicitly
@@ -25,13 +28,8 @@ class SLIC (
   private val zDimSize: Int = dimensions._3
   private val sDimSize: Int = dimensions._4 // Num properties stored in 4th dimension
 
-  // Validate super pixel size against each axis size
-  private val xS = if (xDimSize < superPixelSize) xDimSize else superPixelSize
-  private val yS = if (yDimSize < superPixelSize) yDimSize else superPixelSize
-  private val zS = if (zDimSize < superPixelSize) zDimSize else superPixelSize
-
   // Defined in SLIC implementation paper
-  private val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
+  private val ivtwt = 1.0f / ((superPixelSize / compactness) * ( superPixelSize / compactness))
 
   // Starting Super Center coordinates. Initialized in main segments function
   private val centerCoords: Array[(Int, Int, Int)] =
@@ -41,12 +39,15 @@ class SLIC (
   private val storedDistanceMatrix: INDArray = Nd4j.valueArrayOf(
     Array(xDimSize, yDimSize, zDimSize), Float.MaxValue)
 
+  // Create a new matrix to hold the actual cluster labels
+  private val clusters: INDArray = Nd4j.valueArrayOf(
+    Array(xDimSize.toLong, yDimSize.toLong, zDimSize.toLong), -1, DataType.INT)
+
   /**
     * Main entry point to get segments of matrix. The only public function on this class.
-    * @param clusters The INDArray of same size as input value matrix to hold cluster labels
     * @return An ND4J INDArray representing the world with cluster labels at each voxel point
     */
-  def segments (clusters: INDArray): INDArray = {
+  def segments (): INDArray = {
 
     log.info("Starting segmentation process...")
 
@@ -68,7 +69,14 @@ class SLIC (
 
         // Calculate clusters and return the same INDArray that was given to us
         // to store the cluster labels
-        calculateClusters(clusters)
+        calculateClusters()
+
+        // Center Assignments are not directly forced to form a continuous superpixel.
+        // The superpixels are made continuous by this function which reassigned
+        // isolated "islands" to the best adjacent superpixel.
+        enforceConnectivity()
+
+        clusters // Return the cluster labels matrix
 
       } catch {
 
@@ -211,10 +219,10 @@ class SLIC (
 
   /**
     * The main private function that does the SLIC algorithm
-    * @param clusters The INDArray of same size as input value matrix to hold cluster labels
     * @return 3D INDArray of integers indicating segment labels
     */
-  private def calculateClusters (clusters: INDArray): INDArray = {
+  private def calculateClusters (): Unit = {
+    import scala.math.floor
     import org.nd4j.linalg.ops.transforms.Transforms.pow
     import org.nd4j.linalg.ops.transforms.Transforms.sqrt
     import org.nd4j.linalg.factory.Broadcast
@@ -223,6 +231,11 @@ class SLIC (
 
     var rounds: Int = 0
     var anyChange: Boolean = false
+
+    // How far out to get voxels surrounding a center in each direction
+    val cDeltaX = centerDelta._1
+    val cDeltaY = centerDelta._2
+    val cDeltaZ = centerDelta._3
 
     while (!anyChange && rounds < maxIteration) {
 
@@ -233,19 +246,19 @@ class SLIC (
       // Basically this goes through and assigns voxels to clusters
       // based on distance calculations according to SLIC
       val t0_clusterAssign = System.nanoTime()
-      for (ci <- centerCoords.indices) {
+      for (ci <- (0 until centerCoords.length).toParArray) {
 
         // Get the current center
         val c = centerCoords(ci)
 
         // Setup the starting and ending positions for x.y.z.
         // Find points around the center outward of radius superpixelsize*2
-        val xStart: Int = if (c._1 - 2 * superPixelSize < 0) 0 else c._1 - 2 * superPixelSize
-        val yStart: Int = if (c._2 - 2 * superPixelSize < 0) 0 else c._2 - 2 * superPixelSize
-        val zStart: Int = if (c._3 - 2 * superPixelSize < 0) 0 else c._3 - 2 * superPixelSize
-        val xEnd: Int = if (c._1 + 2 * superPixelSize > xDimSize) xDimSize else c._1 + 2 * superPixelSize
-        val yEnd: Int = if (c._2 + 2 * superPixelSize > yDimSize) yDimSize else c._2 + 2 * superPixelSize
-        val zEnd: Int = if (c._3 + 2 * superPixelSize > zDimSize) zDimSize else c._3 + 2 * superPixelSize
+        val xStart: Int = if (c._1 - cDeltaX * superPixelSize < 0) 0 else floor(c._1 - cDeltaX * superPixelSize).toInt
+        val yStart: Int = if (c._2 - cDeltaY * superPixelSize < 0) 0 else floor(c._2 - cDeltaY * superPixelSize).toInt
+        val zStart: Int = if (c._3 - cDeltaZ * superPixelSize < 0) 0 else floor(c._3 - cDeltaZ * superPixelSize).toInt
+        val xEnd: Int = if (c._1 + cDeltaX * superPixelSize > xDimSize) xDimSize else floor(c._1 + cDeltaX * superPixelSize).toInt
+        val yEnd: Int = if (c._2 + cDeltaY * superPixelSize > yDimSize) yDimSize else floor(c._2 + cDeltaY * superPixelSize).toInt
+        val zEnd: Int = if (c._3 + cDeltaZ * superPixelSize > zDimSize) zDimSize else floor(c._3 + cDeltaZ * superPixelSize).toInt
 
         // Get center voxel information
         val centerVoxelCoords: INDArray = matrix.get(
@@ -258,21 +271,23 @@ class SLIC (
           NDArrayIndex.point(c._1),
           NDArrayIndex.point(c._2),
           NDArrayIndex.point(c._3),
-          NDArrayIndex.interval(3,5) // Indices of actual data features in vector
+          NDArrayIndex.interval(3,6) // Indices of actual data features in vector
         )
+
+        val cAroundShape = Array(xEnd - xStart, yEnd - yStart, zEnd - zStart).map(i=>i.toLong)
+        val arrayIndexIntervalsX = NDArrayIndex.interval(xStart, xEnd)
+        val arrayIndexIntervalsY = NDArrayIndex.interval(yStart, yEnd)
+        val arrayIndexIntervalsZ = NDArrayIndex.interval(zStart, zEnd)
+        val cAroundClusterLabels = Nd4j.valueArrayOf(cAroundShape, ci)
 
         // get information on all the voxels surrounding this center point
         val voxelCoords: INDArray = matrix.get(
-          NDArrayIndex.interval(xStart, xEnd),
-          NDArrayIndex.interval(yStart, yEnd),
-          NDArrayIndex.interval(zStart, zEnd),
+          arrayIndexIntervalsX, arrayIndexIntervalsY, arrayIndexIntervalsZ,
           NDArrayIndex.interval(0,3) // Indices of coordinates stored in vector
         )
         val voxelFeatures: INDArray = matrix.get(
-          NDArrayIndex.interval(xStart, xEnd),
-          NDArrayIndex.interval(yStart, yEnd),
-          NDArrayIndex.interval(zStart, zEnd),
-          NDArrayIndex.interval(3,5) // Indices of actual data features in vector
+          arrayIndexIntervalsX, arrayIndexIntervalsY, arrayIndexIntervalsZ,
+          NDArrayIndex.interval(3,6) // Indices of actual data features in vector
         )
 
         // broadcast subtraction of center point to range of all voxels
@@ -282,6 +297,7 @@ class SLIC (
         val resultForSubCoords: INDArray = Nd4j.valueArrayOf(voxelCoords.shape(), -1f)
         val subCoords = Broadcast.sub(
           voxelCoords, centerVoxelCoords, resultForSubCoords, 3)
+        //log.info("Sub Coords: \n{}", subCoords)
 
         // broadcast subtraction of center point to range of all voxels
         // we want to get feature distance of. this is because shapes are not the same.
@@ -290,32 +306,32 @@ class SLIC (
         val resultForSubFeatures: INDArray = Nd4j.valueArrayOf(voxelFeatures.shape(), -1f)
         val subFeatures = Broadcast.sub(
           voxelFeatures, centerVoxelFeatures, resultForSubFeatures, 3)
+        //log.info("Sub Features: \n{}", subFeatures)
 
         // Calculate the distances of coordinates and features. This will give us a matrix
         // of shape (xEnd-xStart, yEnd-yStart, zEnd-zStart)
         // calculate the distance of coords with center. multiply by ivtwt is a SLIC implementation
         val distanceCoord = sqrt(pow(subCoords, 2).sum(3)).muli(ivtwt)
+        //log.info("Distance Coords: \n{}", distanceCoord)
         // calculate the distance of coords with center
         val distanceFeatures = sqrt(pow(subFeatures, 2).sum(3))
+        //log.info("Distance Features: \n{}", distanceFeatures)
 
         // Add the distance measurements for coordinate space and feature together for each voxel
         val calculatedDistances = distanceCoord.addi(distanceFeatures) // addi is in place addition
+        //log.info("Calculated Distances: \n{}", calculatedDistances)
 
         // Get the current slice of voxels from storedDistanceMatrix which holds distances
         // for the complete larger matrix provided at creation
         val storedDistances = storedDistanceMatrix.get(
-          NDArrayIndex.interval(xStart, xEnd),
-          NDArrayIndex.interval(yStart, yEnd),
-          NDArrayIndex.interval(zStart, zEnd)
+          arrayIndexIntervalsX, arrayIndexIntervalsY, arrayIndexIntervalsZ
         )
 
         // Get a view into the cluster matrix where we store cluster labels.
         // Getting a view will focus the area and give us a subset of the larger matrix
         // of the current voxels that we are computing over
         val clusterAssignment = clusters.get(
-          NDArrayIndex.interval(xStart, xEnd),
-          NDArrayIndex.interval(yStart, yEnd),
-          NDArrayIndex.interval(zStart, zEnd)
+          arrayIndexIntervalsX, arrayIndexIntervalsY, arrayIndexIntervalsZ
         )
 
         // The distances stored in calculatedDistances should be smaller than
@@ -325,19 +341,36 @@ class SLIC (
 
         // Generate a mask of all voxel points where calculated distance is less that stored Distance.
         // lt = Less Than -> gives back a INDArray with BOOL types
-        val isCloserMask = storedDistances.lt(calculatedDistances)
+        val isCloserMask = calculatedDistances.lt(storedDistances).castTo(DataType.INT)
+        val replaceMaskHelper = Nd4j.valueArrayOf(cAroundShape, -1, DataType.INT)
+        // Inverse the bits on the mask, since the putwherewithmask works on 0's not 1's
+        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(0))
+        replaceMaskHelper.assign(0)
+        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(1))
+        replaceMaskHelper.assign(1)
+        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(-1))
+        //log.info("Is Closer Mask:\n{}", isCloserMask)
+
+        //log.info("Stored Distances: \n{}", storedDistances)
+        //log.info("Calculated Distances: \n{}", calculatedDistances)
 
         // Put calculated values that were less than stored with the boolean mask. PutWhereWithMask
         // generates a dupe so the underlying matrix is not modified. Which is why we must do Assign.
         val replacedStoredDistances = storedDistances.putWhereWithMask(isCloserMask, calculatedDistances)
         storedDistances.assign(replacedStoredDistances) // Assign values from putwherewithmask
+        //log.info("Stored Distances After Assign: \n{}", storedDistances)
 
         // Using the mask now set the new Cluster/Center Index for all
         // the points that were less than the stored Distance
+
         val replacedClusterAssignment = clusterAssignment.putWhereWithMask(
           isCloserMask,
-          clusterAssignment.dup().assign(ci)) // Create array here as API expects it
-        clusterAssignment.assign(replacedClusterAssignment) // Assign values from putwherewithmask
+          cAroundClusterLabels) // Create array here as API expects it.
+        //log.info("Replaced Cluster Assignments: \n{}", replacedClusterAssignment)
+
+        // Assign values from putwherewithmask
+        clusterAssignment.assign(replacedClusterAssignment)
+        //log.info("Cluster ID: {} \n{}", ci, clusterAssignment)
 
       }
 
@@ -349,14 +382,15 @@ class SLIC (
         rounds,
         (t1_clusterAssign - t0_clusterAssign) / 1E9)
     }
+  }
 
-    // Return the clusters matrix. Cluster Assignments is a matrix of same
-    // dimensions and size of the original provided matrix. But the scalar values
-    // represent a label of each cluster the voxel point was associated with.
-    // The clusters matrix is provided by the caller of this class as the caller
-    // needs to make use of the matrix to identify and process clusters further.
-    // That way they can destroy the matrix when appropriate instead of this class.
-    clusters
+  /**
+    * Center Assignments are not directly forced to form a continuous superpixel.
+    * The superpixels are made continuous by this function which reassigned
+    * isolated "islands" to the best adjacent superpixel.
+    */
+  private def enforceConnectivity(): Unit = {
+
   }
 
   /**

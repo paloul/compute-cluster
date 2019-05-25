@@ -263,14 +263,12 @@ class SiaAgent extends AiraAgent  {
     val reservoirMatrix = time("Read/Process VOI files and populate matrix", { readFilesGenerateMatrix() })
 
     // Pass in a 4-dimensional array into SLIC. Fourth dimension contains properties/features
-    // Create a 3-dimensional INDArray (matrix) of same size minus 4th dim to hold cluster labels
-    // This is passed into SLIC.segments and used when it calculates and stores labels
+    // SLIC.segments calculates and returns labels
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
         (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6)
-      ).segments(Nd4j.valueArrayOf(
-        Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ), -1))
+      ).segments()
     })
 
     // Write out segments as npy array to file
@@ -310,7 +308,8 @@ class SiaAgent extends AiraAgent  {
     // The 4th dimension is an array holding properties of reservoirs coming from raw data.
     // NOTE: Fourth dimension is size >3. Storing and working with PERM-X and PERM-Z.
     //  The first three values in the fourth dimension are the x.y.z index values
-    val reservoirMatrix = Nd4j.zeros(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6)
+    val reservoirMatrix = Nd4j.valueArrayOf(
+      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6), Float.NaN)
 
     // Loop through matrix and assign voxel indices to vector 0,1,2
     for (
