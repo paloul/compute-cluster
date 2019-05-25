@@ -82,7 +82,7 @@ object SiaAgent extends ShardedMessages {
                           permY: Float, zones: Float) =>
       // nx, ny, nz and zones are floats in the data, but VoiRes needs to represent them
       // as integers because they are used for indexing and zones
-    new VoiRes(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, porosity, permX, permZ, bulkVolume, permY, zones.toInt)
+    VoiRes(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, porosity, permX, permZ, bulkVolume, permY, zones.toInt)
   }
 
   //,x,y,z,nx,ny,nz,Index,OrigName
@@ -91,7 +91,7 @@ object SiaAgent extends ShardedMessages {
   implicit val voiFaultDecoder: RowDecoder[VoiFault] =
     RowDecoder.ordered { (i: Int, x: Float, y: Float, z: Float,
                           nx: Float, ny: Float, nz: Float, index: Float, origName: String) =>
-      new VoiFault(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, index.toInt, origName)
+      VoiFault(i, x, y, z, nx.toInt, ny.toInt, nz.toInt, index.toInt, origName)
     }
   ///////////////////////
 

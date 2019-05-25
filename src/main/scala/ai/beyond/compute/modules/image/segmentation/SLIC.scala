@@ -12,11 +12,11 @@ import scala.collection.parallel.mutable.ParArray
 class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
-       superPixelSize: Int = 22,
-       compactness: Float = 10f,
+       superPixelSize: Int = 20,
+       compactness: Float = 1f,
        maxIteration: Int = 2,
        minSuperSize: Int = 1,
-       centerDelta: (Float, Float, Float) = (2.25f, 2.25f, 2.25f)
+       centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
     ) (implicit logger: akka.event.LoggingAdapter) {
 
   // Cache the logger provided implicitly
