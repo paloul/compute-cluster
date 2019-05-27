@@ -306,21 +306,10 @@ class SiaAgent extends AiraAgent  {
 
     // main reservoir matrix that holds our data, 4-dimensional array with the 4th dimension holding values
     // The 4th dimension is an array holding properties of reservoirs coming from raw data.
-    // NOTE: Fourth dimension is size >3. Storing and working with PERM-X and PERM-Z.
+    // NOTE: Fourth dimension is size >3.
     //  The first three values in the fourth dimension are the x.y.z index values
     val reservoirMatrix = Nd4j.valueArrayOf(
       Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6), Float.NaN)
-
-    // Loop through matrix and assign voxel indices to vector 0,1,2
-    for (
-      vX <- 0 until META_PROPS.voiDimX;
-      vY <- 0 until META_PROPS.voiDimY;
-      vZ <- 0 until META_PROPS.voiDimZ
-    ) {
-      reservoirMatrix.putScalar(Array(vX, vY, vZ, 0), vX)
-      reservoirMatrix.putScalar(Array(vX, vY, vZ, 1), vY)
-      reservoirMatrix.putScalar(Array(vX, vY, vZ, 2), vZ)
-    }
 
     // Create a buffered source to the voi res file, we do this because there is no need to load
     // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
@@ -337,10 +326,10 @@ class SiaAgent extends AiraAgent  {
       {
         // Right side of read result is our actual value, IF everything went well reading it
         case Right(voiRes) => {
-          // Storing as [NX,NY,NZ,PERM-X,PERM-Z] in the fourth dimension
-//          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.nx)
-//          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.ny)
-//          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 2), voiRes.nz)
+          // Storing as [NX,NY,NZ,PERM-X,PERM-Z,POROSITY] in the fourth dimension
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.nx)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.ny)
+          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 2), voiRes.nz)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 3), voiRes.permX)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 5), voiRes.porosity)
