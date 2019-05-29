@@ -2,9 +2,11 @@ name := "ai.beyond.compute-cluster"
 
 organization := "ai.beyond"
 
+maintainer := "gpaloulian@beyond.ai"
+
 version := "0.0.1"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.11.12"
 
 exportJars := true
 
@@ -23,7 +25,7 @@ libraryDependencies ++= {
   val akkaVersion = "2.5.20"
   val akkaHttpVersion = "10.1.7"
   val akkaPersistenceCassandra = "0.93"
-  val sparkVersion = "2.4.0"
+  val nd4jVersion = "1.0.0-beta4"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -58,19 +60,31 @@ libraryDependencies ++= {
 
     // Mongo client
     "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0",
-    
-    // Spark
-    "org.apache.spark" %% "spark-core" % sparkVersion,
-    "org.apache.spark" %% "spark-sql" % sparkVersion,
-    "org.apache.spark" %% "spark-mllib" % sparkVersion,
-    // Spark dependencies
-    "org.scala-lang.modules" %% "scala-xml" % "1.1.1"
+
+    // kantan.csv - https://nrinaudo.github.io/kantan.csv/
+    "com.nrinaudo" %% "kantan.csv" % "0.5.0",
+    "com.nrinaudo" %% "kantan.csv-java8" % "0.5.0",
+    "com.nrinaudo" %% "kantan.csv-generic" % "0.5.0",
+
+    // https://deeplearning4j.org/docs/latest/deeplearning4j-config-buildtools
+    "org.deeplearning4j" % "deeplearning4j-core" % nd4jVersion,
+    "org.nd4j" % "nd4j-native-platform" % nd4jVersion
   )
 }
+
 
 // Settings for the docker image to be built
 // Look into Docker support for sbt-native-packager
 // To build the docker image: sbt docker:publishLocal
+/*
+universal:packageBin - Generates a universal zip file
+universal:packageZipTarball - Generates a universal tgz file
+debian:packageBin - Generates a deb
+docker:publishLocal - Builds a Docker image using the local Docker server
+rpm:packageBin - Generates an rpm
+universal:packageOsxDmg - Generates a DMG file with the same contents as the universal zip/tgz.
+windows:packageBin - Generates an MSI
+ */
 packageName in Docker := name.value
 version in Docker := version.value
 dockerBaseImage := "openjdk:8-stretch"

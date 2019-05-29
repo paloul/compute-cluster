@@ -1,4 +1,4 @@
-package ai.beyond.compute.rest.aira
+package ai.beyond.compute.rest.aira.geo
 
 import ai.beyond.compute.agents.aira.geo.{GeoDynamicAgent, GeoDynamicAgentJsonSupport}
 import akka.actor.{ActorRef, ActorSystem}
@@ -14,7 +14,7 @@ import scala.util.Try
 // RestService defines all the routes and handlers for each request.
 // This class is where you would add additional functionality concerning
 // the rest API interface
-class AiraAgentRestServices(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeout) extends GeoDynamicAgentJsonSupport {
+class GeoDynamicAgentRestServices(agents: ActorRef, system: ActorSystem)(implicit timeout: Timeout) extends GeoDynamicAgentJsonSupport {
 
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
