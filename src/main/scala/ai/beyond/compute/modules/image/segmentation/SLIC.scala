@@ -10,8 +10,8 @@ import org.nd4j.linalg.api.ops.impl.reduce.longer.MatchCondition
 class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
-       superPixelSize: Int = 15,
-       compactness: Float = .01f,
+       superPixelSize: Int = 3,
+       compactness: Float = 10f,
        maxIteration: Int = 3,
        minSuperSize: Int = 1,
        centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
