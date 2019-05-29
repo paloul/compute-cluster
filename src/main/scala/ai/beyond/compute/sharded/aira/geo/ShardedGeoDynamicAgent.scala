@@ -1,30 +1,30 @@
-package ai.beyond.compute.sharded.aira
+package ai.beyond.compute.sharded.aira.geo
 
-import ai.beyond.compute.agents.aira.AiraSampleOneAgent
+import ai.beyond.compute.agents.aira.geo.GeoDynamicAgent
 import ai.beyond.compute.sharded.ShardedMessages
 import akka.actor.{Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 
-// Companion object for ShardedAiraSampleOneAgent. Overall just
+// Companion object for ShardedComputeAgent. Overall just
 // a helper object to gain access to the underlying
 // ShardedMessages extractId and extractShard functions.
 // Along with giving algorithm agents a shard name.
-object ShardedAiraSampleOneAgent extends ShardedMessages {
-  def props = Props(new ShardedAiraSampleOneAgent)
+object ShardedGeoDynamicAgent extends ShardedMessages {
+  def props = Props(new ShardedGeoDynamicAgent)
   def name(agentId: Long): String = agentId.toString
 
-  val shardName: String = "aira-sample-one-agents"
+  val shardName: String = "geo-dynamic-compute-agents"
 }
 
-class ShardedAiraSampleOneAgent extends AiraSampleOneAgent {
+class ShardedGeoDynamicAgent extends GeoDynamicAgent {
 
   // Capture when an instance was created, val because it shouldn't change
-  val objCreationTime = System.nanoTime()
+  val objCreationTime: Long = System.nanoTime()
 
   // Default handler for any UNHANDLED messages received not captured by
   // the base class. Any messages received by an Agent that
   // are unhandled by its current RECEIVE definition are caught here
-  override def unhandled(msg: Any) = msg match {
+  override def unhandled(msg: Any): Unit = msg match {
     // Received a ReceiveTimeout message from the context. This message is initiated
     // by the call above to context.setReceiveTimeout after x seconds have passed
     case ReceiveTimeout =>
@@ -35,10 +35,10 @@ class ShardedAiraSampleOneAgent extends AiraSampleOneAgent {
       // to the child, therefore putting a stop to all outgoing messages intended for the child
       // before sending it the official stop message.
       log.info("Received Timeout message, initiating Passivate for self [{}]", self.path.toString)
-      context.parent ! Passivate(stopMessage = AiraSampleOneAgent.Stop)
+      context.parent ! Passivate(stopMessage = GeoDynamicAgent.Stop)
 
     // A Stop message was received so we stop ourselves
-    case AiraSampleOneAgent.Stop => context.stop(self)
+    case GeoDynamicAgent.Stop => context.stop(self)
 
     // Catch the unhandled message, as Scala Match throws an error scala.MatchError, if we don't catch them
     case _ => log.warning("Received unknown message that was unhandled, ignoring")

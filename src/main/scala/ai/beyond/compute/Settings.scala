@@ -6,9 +6,11 @@ import scala.concurrent.duration._
 import akka.actor._
 import com.typesafe.config.Config
 
-// This companion object here should not be touched, its basic infrastructure support
-// to help create a connection between our application.conf file, Settings class
-// and the Actor System.
+/**
+  * This companion object here should not be touched, its basic infrastructure support
+  * to help create a connection between our application.conf file, Settings class
+  * and the Actor System.
+  */
 object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
 
   // The apply method is a scala way of working with
@@ -28,9 +30,30 @@ object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
   override def get(system: ActorSystem): Settings = super.get(system)
 }
 
+/**
+  * Settings class to help parse applciation.conf and make values available
+  * during runtime of application. If you want something from app.conf
+  * available in application then add objects and parsing logic here
+  * @param config
+  */
 class Settings(config: Config) extends Extension {
 
   def this(system: ExtendedActorSystem) = this(system.settings.config)
+
+  import org.nd4j.linalg.factory.Nd4j
+  import org.nd4j.linalg.api.buffer.DataType
+  Nd4j.setDefaultDataTypes(DataType.FLOAT, DataType.FLOAT)
+
+  // Holds config params from application.conf concerning hdfs
+  object hdfs {
+    val hdfsBase: String = config.getString("application.hdfs.base-path")
+  }
+
+  object sia {
+    object files {
+      val basePath: String = config.getString("application.sia.files.base-path")
+    }
+  }
 
   // Holds config params from application.conf concerning the Cluster App settings
   object cluster {

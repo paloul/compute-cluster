@@ -30,7 +30,8 @@ object Main extends App with RestServiceSupport {
   //  agent that crash due to underlying kafka library or whatever reason
   // The Kafka Master Agent is only accessible internally per cluster, no
   // external API access
-  system.actorOf(KafkaMasterAgent.props(settings), KafkaMasterAgent.name)
+  if (settings.kafka.numberProducerAgents > 0 )
+    system.actorOf(KafkaMasterAgent.props(settings), KafkaMasterAgent.name)
 
   // Start the MongoDb Agent for this actor system. Each Actor System
   // will have one MongoDb agent that handles all interaction for mongo.
@@ -40,11 +41,12 @@ object Main extends App with RestServiceSupport {
   // the mongo db cluster. No need to create multiple MongoDb Agents.
   // The Mongo Master Agent is only accessible internally per cluster, no
   // external API access
-  system.actorOf(MongoMasterAgent.props(settings), MongoMasterAgent.name)
+  if (settings.mongo.numberMongoDbAgents > 0)
+    system.actorOf(MongoMasterAgent.props(settings), MongoMasterAgent.name)
 
   // Get the main actor type to be used for sharded cluster of actors
   // ShardedAgents deals with identifying incoming requests and routing them
   // correctly to the right agent type.
   // Start the Rest Service hosted by RestServiceSupport
-  startRestService(system.actorOf(ShardedAgents.props, ShardedAgents.name), settings)
+  startRestService(system.actorOf(ShardedAgents.props(settings), ShardedAgents.name), settings)
 }
