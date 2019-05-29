@@ -12,7 +12,7 @@ import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import org.apache.spark.sql.Encoders
+//import org.apache.spark.sql.Encoders
 
 object GeoDynamicAgent extends ShardedMessages {
   def props(agentId: String) = Props(new GeoDynamicAgent)
@@ -56,7 +56,7 @@ object GeoDynamicAgent extends ShardedMessages {
   // CSV Schema Specifications
   ///////////////////////
 
-  //,Well identifier,Comp Name,Oil (BOPD),Gas (MCFD),Water (BWPD)
+  /*//,Well identifier,Comp Name,Oil (BOPD),Gas (MCFD),Water (BWPD)
   case class ProdSchema(date: String, wellId: String, compName: String, oil: Float, gas: Float, water: Float)
   private val PROD_SCHEMA = Encoders.product[ProdSchema].schema
 
@@ -97,7 +97,7 @@ object GeoDynamicAgent extends ShardedMessages {
   //  values for only cells within the reservoir. Could they be merged, or one ignored?
   //,nx,ny,nz,X,Y,Z
   case class DfResSchema(ind: Int, nx: Float, ny: Float, nz: Float, x: Float, y: Float, z: Float)
-  private val DF_RES_SCHEMA = Encoders.product[DfResSchema].schema
+  private val DF_RES_SCHEMA = Encoders.product[DfResSchema].schema*/
 
   ///////////////////////
 }
@@ -116,10 +116,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
   // Import the companion object above to use the messages defined for us
   import GeoDynamicAgent._
   // Import implicits specific to spark session
-  import spark.implicits._
-
-  // Constants
-  val HDFS_BASE: String = ShardedAgents.mySettings.get.spark.hdfsBase
+  //import spark.implicits._
 
   // Meta property object to store any meta data
   object META_PROPS {
@@ -175,8 +172,8 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     case Start(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath, atlMatPath, atlGridPath, dfResPath) =>
       log.info("Starting compute with job ID[{}]", id)
       sender ! State(id, "Starting", META_PROPS.percentComplete, META_PROPS.lastKnownUpdate)
-      processSpark(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath, atlMatPath,
-        atlGridPath, dfResPath)
+      /*processSpark(id, prodPath, owcPath, faultPath, perfPath, trajPath, geoMeanPath, atlMatPath,
+        atlGridPath, dfResPath)*/
       become(computing)
   }
 
@@ -234,7 +231,7 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     * @param atlGridPath
     * @param dfResPath
     */
-  def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
+  /*def processSpark(id: String, prodPath: String, owcPath: String, faultPath: String, perfPath: String,
                    trajPath: String, geoMeanPath: String, atlMathPath: String, atlGridPath: String,
                    dfResPath: String): Unit = {
     log.info("File paths (1/3): {}, {}, {}", prodPath, owcPath, faultPath)
@@ -384,6 +381,6 @@ class GeoDynamicAgent extends AiraAgent with GeoDynamicAgentJsonSupport {
     dfResDs.printSchema()
     dfResDs.show(2)
     log.info("df_res Data Set Length: [{}]", dfResDs.count())
-  }
+  }*/
 
 }

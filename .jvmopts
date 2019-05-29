@@ -1,4 +1,5 @@
--Xms512M
--Xmx4096M
+-Xms1G
+-Xmx4G
 -Xss2M
--XX:MaxMetaspaceSize=1024M
+-XX:MaxMetaspaceSize=2G
+-Dorg.bytedeco.javacpp.maxbytes=8G

@@ -34,14 +34,14 @@ class ShardedAgents extends Actor with ActorLogging {
     ShardedComputeAgent.extractShardId
   )
 
-  // Start the cluster shard system and manager for the GeoDynamic agents
-  val shardedGeoDynamicAgents: ActorRef = ClusterSharding(context.system).start(
-    ShardedGeoDynamicAgent.shardName,
-    ShardedGeoDynamicAgent.props,
-    ClusterShardingSettings(context.system),
-    ShardedGeoDynamicAgent.extractEntityId,
-    ShardedGeoDynamicAgent.extractShardId
-  )
+//  // Start the cluster shard system and manager for the GeoDynamic agents
+//  val shardedGeoDynamicAgents: ActorRef = ClusterSharding(context.system).start(
+//    ShardedGeoDynamicAgent.shardName,
+//    ShardedGeoDynamicAgent.props,
+//    ClusterShardingSettings(context.system),
+//    ShardedGeoDynamicAgent.extractEntityId,
+//    ShardedGeoDynamicAgent.extractShardId
+//  )
 
   // Start the cluster shard system and manager for the Sia agents
   val shardedSiaAgents: ActorRef = ClusterSharding(context.system).start(
@@ -64,8 +64,8 @@ class ShardedAgents extends Actor with ActorLogging {
     case siaMessage: SiaAgent.Message =>
       shardedSiaAgents forward siaMessage
 
-    case geoDynamicMessage: GeoDynamicAgent.Message =>
-      shardedGeoDynamicAgents forward geoDynamicMessage
+//    case geoDynamicMessage: GeoDynamicAgent.Message =>
+//      shardedGeoDynamicAgents forward geoDynamicMessage
   }
 
 }
