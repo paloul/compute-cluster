@@ -6,12 +6,13 @@ import org.nd4j.linalg.factory.Nd4j
 import org.nd4j.linalg.indexing.conditions._
 import org.nd4j.linalg.indexing.{BooleanIndexing, NDArrayIndex}
 import org.nd4j.linalg.api.ops.impl.reduce.longer.MatchCondition
+import org.nd4j.linalg.ops.transforms.Transforms
 
 class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
-       superPixelSize: Int = 3,
-       compactness: Float = 10f,
+       superPixelSize: Int = 15,
+       compactness: Float = .1f,
        maxIteration: Int = 3,
        minSuperSize: Int = 1,
        centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
@@ -27,7 +28,7 @@ class SLIC (
   private val sDimSize: Int = dimensions._4 // Num properties stored in 4th dimension
 
   // Defined in SLIC implementation paper
-  private val ivtwt = 1.0f / ((superPixelSize / compactness) * ( superPixelSize / compactness))
+  private val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
 
   // Starting Super Center coordinates. Initialized in main segments function
   private var centerCoords: Array[(Int, Int, Int)] = _
@@ -133,14 +134,10 @@ class SLIC (
 
     log.info("Super Centers Initialized [{}]", centersGrid.length)
 
-    log.info("Optimizing Grid Super Centers...")
     // Optimize the centers and get them back as an array
     val optimumCentersGrid = adjustCentersAwayFromEmptyRegions(centersGrid)
-    log.info("Optimized Grid Super Centers [{}]", optimumCentersGrid.length)
 
-    log.info("Perturbing Super Centers to Low Contrast...")
     val perturbedCentersGrid = adjustSuperCentersToLowContrast(optimumCentersGrid)
-    log.info("Perturbed Super Centers to Low Contrast")
 
     perturbedCentersGrid // Return optimum placed centers
   }
@@ -153,6 +150,8 @@ class SLIC (
     */
   private def adjustCentersAwayFromEmptyRegions(
                      centers: IndexedSeq[(Int, Int, Int)]): Array[(Int, Int, Int)] = {
+
+    log.info("Optimizing Grid Super Centers...")
 
     // Create an empty marked for removal container for centers that we cannot find any
     // reasonable alternative for. This will help us keep centers down if they are just NaNs
@@ -206,6 +205,8 @@ class SLIC (
     // Get the difference of original centers and marker for removal centers. Add in the
     // alternate centers identified (if any) for those that were deleted.
     val optimumCenters = centers.diff(markedForRemoval) ++ markedForAddition
+
+    log.info("Optimized Grid Super Centers [{}]", optimumCenters.length)
 
     optimumCenters.toArray // Return optimum centers as array
   }
@@ -297,6 +298,8 @@ class SLIC (
     import org.nd4j.linalg.ops.transforms.Transforms.pow
     import org.nd4j.linalg.ops.transforms.Transforms.sqrt
     import org.nd4j.linalg.factory.Broadcast
+
+    log.info("Perturbing Super Centers to Low Contrast...")
 
     // Loop through each current center
     centers.map( c => {
@@ -423,6 +426,7 @@ class SLIC (
     import org.nd4j.linalg.ops.transforms.Transforms.sqrt
     import org.nd4j.linalg.factory.Broadcast
 
+
     log.info("Calculating Clusters...")
 
     var rounds: Int = 0
@@ -471,11 +475,11 @@ class SLIC (
           NDArrayIndex.interval(3,sDimSize) // Indices of actual data features in vector
         )
 
-        val cAroundShape = Array(xEnd - xStart, yEnd - yStart, zEnd - zStart).map(i=>i.toLong)
+        val cAroundShape = Array(xEnd - xStart, yEnd - yStart, zEnd - zStart)
         val arrayIndexIntervalsX = NDArrayIndex.interval(xStart, xEnd)
         val arrayIndexIntervalsY = NDArrayIndex.interval(yStart, yEnd)
         val arrayIndexIntervalsZ = NDArrayIndex.interval(zStart, zEnd)
-        val cAroundClusterLabels = Nd4j.valueArrayOf(cAroundShape, ci)
+        val cAroundClusterLabels = Nd4j.createUninitialized(cAroundShape).assign(ci)
 
         // get information on all the voxels surrounding this center point
         val voxelCoords: INDArray = matrix.get(
@@ -491,19 +495,17 @@ class SLIC (
         // we want to get coord distance of. this is because shapes are not the same
         // Voxel Coords is a 3D shape surrounding the center point. Center Coords is
         // a scalar vector since we pull out 4th dimension using ArrayIndex.point.
-        val resultForSubCoords: INDArray = Nd4j.valueArrayOf(voxelCoords.shape(), -1f)
+        val resultForSubCoords: INDArray = Nd4j.createUninitialized(voxelCoords.shape())
         val subCoords = Broadcast.sub(
           voxelCoords, centerVoxelCoords, resultForSubCoords, 3)
-        //log.info("Sub Coords: \n{}", subCoords)
 
         // broadcast subtraction of center point to range of all voxels
         // we want to get feature distance of. this is because shapes are not the same.
         // Voxel Features is a 3D shape surrounding the center point. Center Features is
         // a scalar vector since we pull out 4th dimension using ArrayIndex.point.
-        val resultForSubFeatures: INDArray = Nd4j.valueArrayOf(voxelFeatures.shape(), -1f)
+        val resultForSubFeatures: INDArray = Nd4j.createUninitialized(voxelFeatures.shape())
         val subFeatures = Broadcast.sub(
           voxelFeatures, centerVoxelFeatures, resultForSubFeatures, 3)
-        //log.info("Sub Features: \n{}", subFeatures)
 
         // Calculate the distances of coordinates and features. This will give us a matrix
         // of shape (xEnd-xStart, yEnd-yStart, zEnd-zStart)
@@ -538,24 +540,13 @@ class SLIC (
 
         // Generate a mask of all voxel points where calculated distance is less that stored Distance.
         // lt = Less Than -> gives back a INDArray with BOOL types
-        val isCloserMask = calculatedDistances.lt(storedDistances).castTo(DataType.INT)
-        val replaceMaskHelper = Nd4j.valueArrayOf(cAroundShape, -1, DataType.INT)
-        // Inverse the bits on the mask, since the putwherewithmask works on 0's not 1's
-        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(0))
-        replaceMaskHelper.assign(0)
-        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(1))
-        replaceMaskHelper.assign(1)
-        BooleanIndexing.replaceWhere(isCloserMask, replaceMaskHelper, Conditions.equals(-1))
-        //log.info("Is Closer Mask:\n{}", isCloserMask)
-
-        //log.info("Stored Distances: \n{}", storedDistances)
-        //log.info("Calculated Distances: \n{}", calculatedDistances)
+        // Take the NOT of the mask returned to flip bits stored in matrix mask
+        val isCloserMask = Transforms.not(calculatedDistances.lt(storedDistances))
 
         // Put calculated values that were less than stored with the boolean mask. PutWhereWithMask
         // generates a dupe so the underlying matrix is not modified. Which is why we must do Assign.
         val replacedStoredDistances = storedDistances.putWhereWithMask(isCloserMask, calculatedDistances)
         storedDistances.assign(replacedStoredDistances) // Assign values from putwherewithmask
-        //log.info("Stored Distances After Assign: \n{}", storedDistances)
 
         // Using the mask now set the new Cluster/Center Index for all
         // the points that were less than the stored Distance
@@ -563,11 +554,7 @@ class SLIC (
         val replacedClusterAssignment = clusterAssignment.putWhereWithMask(
           isCloserMask,
           cAroundClusterLabels) // Create array here as API expects it.
-        //log.info("Replaced Cluster Assignments: \n{}", replacedClusterAssignment)
-
-        // Assign values from putwherewithmask
-        clusterAssignment.assign(replacedClusterAssignment)
-        //log.info("Cluster ID: {} \n{}", ci, clusterAssignment)
+        clusterAssignment.assign(replacedClusterAssignment) // Assign values from putwherewithmask
 
       }
 

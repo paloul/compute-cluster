@@ -267,7 +267,7 @@ class SiaAgent extends AiraAgent  {
     val segments: INDArray = time ("Initiate SLIC and get Segments", {
       new SLIC(
         reservoirMatrix,
-        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6)
+        (META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 4)
       ).segments()
     })
 
@@ -309,7 +309,7 @@ class SiaAgent extends AiraAgent  {
     // NOTE: Fourth dimension is size >3.
     //  The first three values in the fourth dimension are the x.y.z index values
     val reservoirMatrix = Nd4j.valueArrayOf(
-      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 6), Float.NaN)
+      Array(META_PROPS.voiDimX, META_PROPS.voiDimY, META_PROPS.voiDimZ, 4), Float.NaN)
 
     // Create a buffered source to the voi res file, we do this because there is no need to load
     // the entire file into memory. We go line by line and create the data structure, a 3D Matrix,
@@ -331,8 +331,8 @@ class SiaAgent extends AiraAgent  {
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.ny)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 2), voiRes.nz)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 3), voiRes.permX)
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
-          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 5), voiRes.porosity)
+//          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
+//          reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 5), voiRes.porosity)
         }
         // Left side of read result is the error, IF something went bad
         case Left(error) => {
