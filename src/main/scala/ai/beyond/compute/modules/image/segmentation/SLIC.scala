@@ -13,10 +13,12 @@ class SLIC (
        dimensions: (Int, Int, Int, Int),
        superPixelSize: Int = 15,
        compactness: Float = .1f,
-       maxIteration: Int = 3,
+       maxIteration: Int = 15,
        minSuperSize: Int = 1,
        centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
     ) (implicit logger: akka.event.LoggingAdapter) {
+
+  private case class Center(x: Int, y: Int, z: Int, nVoxels: Int, voxelFeatureAvgs: Array[Int])
 
   // Cache the logger provided implicitly
   private val log = logger
@@ -115,10 +117,6 @@ class SLIC (
     import scala.math.round
 
     log.info("Initializing Super Centers...")
-
-    // x -> tuple._1
-    // y -> tuple._2
-    // z -> tuple._3
 
     val xStart: Int = if (dims._1 <= gridInterval) floor(dims._1 / 2).toInt else round(gridInterval / 2f)
     val yStart: Int = if (dims._2 <= gridInterval) floor(dims._2 / 2).toInt else round(gridInterval / 2f)
@@ -430,16 +428,20 @@ class SLIC (
     log.info("Calculating Clusters...")
 
     var rounds: Int = 0
-    var anyChange: Boolean = false
+    var anyChange: Boolean = true
 
     // How far out to get voxels surrounding a center in each direction
     val cDeltaX = centerDelta._1
     val cDeltaY = centerDelta._2
     val cDeltaZ = centerDelta._3
 
-    while (!anyChange && rounds < maxIteration) {
+    while (anyChange && rounds < maxIteration) {
 
-      anyChange = false // reset the any change bit
+      // reset the any change bit
+      anyChange = false
+
+      // Increment the round counter
+      rounds += 1
 
       // Use the indices of the centers to retrieve them,
       // since we use the center index as the cluster label index.
@@ -541,25 +543,33 @@ class SLIC (
         // Generate a mask of all voxel points where calculated distance is less that stored Distance.
         // lt = Less Than -> gives back a INDArray with BOOL types
         // Take the NOT of the mask returned to flip bits stored in matrix mask
-        val isCloserMask = Transforms.not(calculatedDistances.lt(storedDistances))
+        val isCloserMask = Transforms.not(calculatedDistances.lt(storedDistances)).castTo(DataType.INT)
 
-        // Put calculated values that were less than stored with the boolean mask. PutWhereWithMask
-        // generates a dupe so the underlying matrix is not modified. Which is why we must do Assign.
-        val replacedStoredDistances = storedDistances.putWhereWithMask(isCloserMask, calculatedDistances)
-        storedDistances.assign(replacedStoredDistances) // Assign values from putwherewithmask
+        // Check if any voxel changed cluster assignment
+        val op: MatchCondition = new MatchCondition(isCloserMask, Conditions.greaterThan(0))
+        val numVoxelsChanged = Nd4j.getExecutioner.exec(op).getInt(0)
+        log.debug("Num Voxels Changed Label: [{}]", numVoxelsChanged)
 
-        // Using the mask now set the new Cluster/Center Index for all
-        // the points that were less than the stored Distance
+        // If we have any voxels that are changing labels then change them and update their stored distance
+        if (numVoxelsChanged > 0) {
 
-        val replacedClusterAssignment = clusterAssignment.putWhereWithMask(
-          isCloserMask,
-          cAroundClusterLabels) // Create array here as API expects it.
-        clusterAssignment.assign(replacedClusterAssignment) // Assign values from putwherewithmask
+          // Yes there was change, mark it
+          anyChange = true
 
+          // Put calculated values that were less than stored with the boolean mask. PutWhereWithMask
+          // generates a dupe so the underlying matrix is not modified. Which is why we must do Assign.
+          val replacedStoredDistances = storedDistances.putWhereWithMask(isCloserMask, calculatedDistances)
+          storedDistances.assign(replacedStoredDistances) // Assign values from putwherewithmask
+
+          // Using the mask now set the new Cluster/Center Index for all
+          // the points that were less than the stored Distance
+
+          val replacedClusterAssignment = clusterAssignment.putWhereWithMask(
+            isCloserMask,
+            cAroundClusterLabels) // Create array here as API expects it.
+          clusterAssignment.assign(replacedClusterAssignment) // Assign values from putwherewithmask
+        }
       }
-
-      // Increment the round counter
-      rounds += 1
 
       val t1_clusterAssign = System.nanoTime()
       log.info("Round [{}] cluster assignment time [{} (s)]",
