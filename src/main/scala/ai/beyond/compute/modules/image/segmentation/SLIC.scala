@@ -160,8 +160,7 @@ class SLIC (
     var markedForAddition: IndexedSeq[(Int, Int, Int)] = IndexedSeq()
 
     // Loop through each center
-    //for (ci <- centers.indices) {
-    for (ci <- (0 until centers.length).par) {
+    for (ci <- centers.indices.par) {
 
       // Get the current center
       val c = centers(ci)
@@ -448,8 +447,7 @@ class SLIC (
       // Basically this goes through and assigns voxels to clusters
       // based on distance calculations according to SLIC
       val t0_clusterAssign = System.nanoTime()
-      //for (ci <- centerCoords.indices) {
-      for (ci <- (0 until centerCoords.length).par) {
+      for (ci <- centerCoords.indices.par) {
 
         // Get the current center
         val c = centerCoords(ci)
