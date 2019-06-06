@@ -8,6 +8,8 @@ import org.nd4j.linalg.indexing.{BooleanIndexing, NDArrayIndex}
 import org.nd4j.linalg.api.ops.impl.reduce.longer.MatchCondition
 import org.nd4j.linalg.ops.transforms.Transforms
 
+import scala.collection.parallel.immutable.ParRange
+
 class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
@@ -18,7 +20,15 @@ class SLIC (
        centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
     ) (implicit logger: akka.event.LoggingAdapter) {
 
-  private case class Center(x: Int, y: Int, z: Int, nVoxels: Int, voxelFeatureAvgs: Array[Int])
+  // Simple Case class that defines a center. Holds more than just x.y.z values as we need
+  // to calculate averages for centers and move x.y.z defining this center according to weight
+  // of voxels assigned to this center
+  private case class Center(
+                 var x: Int,
+                 var y: Int,
+                 var z: Int,
+                 var nVoxels: Int,
+                 var voxelFeatureAvgs: INDArray)
 
   // Cache the logger provided implicitly
   private val log = logger
@@ -33,7 +43,7 @@ class SLIC (
   private val ivtwt = 1.0f / ((superPixelSize / compactness) * (superPixelSize / compactness))
 
   // Starting Super Center coordinates. Initialized in main segments function
-  private var centerCoords: Array[(Int, Int, Int)] = _
+  private var centerCoords: Array[Center] = _
 
   // Matrix to hold distance values of each point to a center
   private var storedDistanceMatrix: INDArray = _
@@ -64,7 +74,7 @@ class SLIC (
       try {
 
         // Initialize Centers
-        centerCoords = initSuperCenters((xDimSize, yDimSize, zDimSize), superPixelSize)
+        centerCoords = initSuperCenters((xDimSize, yDimSize, zDimSize, sDimSize), superPixelSize)
 
         // Create the temporary matrix to store distance calculations
         storedDistanceMatrix = Nd4j.valueArrayOf(
@@ -111,8 +121,8 @@ class SLIC (
     * @param gridInterval Initial spacing of super pixels placed in the 3D grid
     * @return Array of Int tuples, representing (x,y,z)
     */
-  private def initSuperCenters(dims: (Int, Int, Int),
-                               gridInterval: Int): Array[(Int, Int, Int)] = {
+  private def initSuperCenters(dims: (Int, Int, Int, Int),
+                               gridInterval: Int): Array[Center] = {
     import scala.math.floor
     import scala.math.round
 
@@ -127,7 +137,9 @@ class SLIC (
       y_s <- yStart until dims._2 by gridInterval;
       z_s <- zStart until dims._3 by gridInterval
     } yield {
-      (x_s, y_s, z_s)
+      //(x_s, y_s, z_s)
+      // Create a new center with coordinates, initiate count to 0, initiate features vector to 0
+      Center(x_s, y_s, z_s, 0, Nd4j.zeros(dims._4 - 3))
     }
 
     log.info("Super Centers Initialized [{}]", centersGrid.length)
@@ -147,33 +159,32 @@ class SLIC (
     * @return Modified list of Centers as Indexed Sequence [(int, int, int)]
     */
   private def adjustCentersAwayFromEmptyRegions(
-                     centers: IndexedSeq[(Int, Int, Int)]): Array[(Int, Int, Int)] = {
+                     centers: IndexedSeq[Center]): Array[Center] = {
 
     log.info("Optimizing Grid Super Centers...")
 
     // Create an empty marked for removal container for centers that we cannot find any
     // reasonable alternative for. This will help us keep centers down if they are just NaNs
-    var markedForRemoval: IndexedSeq[(Int, Int, Int)] = IndexedSeq()
+    var markedForRemoval: IndexedSeq[Center] = IndexedSeq()
 
     // Create an empty marked for addition container to add potential new centers identified
     // that can replace the ones marked for deletion.
-    var markedForAddition: IndexedSeq[(Int, Int, Int)] = IndexedSeq()
+    var markedForAddition: IndexedSeq[Center] = IndexedSeq()
+
+    // Get parallel indices to traverse centers
+    val centerIndices: ParRange = centers.indices.par
 
     // Loop through each center
-    for (ci <- centers.indices.par) {
+    for (ci <- centerIndices) {
 
       // Get the current center
       val c = centers(ci)
 
-      val xC: Int = c._1
-      val yC: Int = c._2
-      val zC: Int = c._3
-
       // Get center voxel information
       val centerVoxelCoords: INDArray = matrix.get(
-        NDArrayIndex.point(xC),
-        NDArrayIndex.point(yC),
-        NDArrayIndex.point(zC),
+        NDArrayIndex.point(c.x),
+        NDArrayIndex.point(c.y),
+        NDArrayIndex.point(c.z),
         NDArrayIndex.interval(0,3) // Indices of coordinates stored in vector
       )
 
@@ -184,11 +195,12 @@ class SLIC (
       if (numNaNs > 0) {
 
         // Mark this center for deletion as its on a NaN voxel with no data recorded.
-        markedForRemoval = markedForRemoval :+ (xC, yC, zC)
+        markedForRemoval = markedForRemoval :+ c
 
         // Attempt to find an alternate for the one we just marked for deletion. Its not
         // guaranteed that we will find an alternate. If we do then add it into centers
-        val alternate: (Boolean, (Int, Int, Int)) = findAlternateForCenter((xC, yC, zC))
+        val alternate: (Boolean, Center) = findAlternateForCenter(c)
+
         if (alternate._1) {
           // We did find an alternate for the current center. Add it to our temp collection
           markedForAddition = markedForAddition :+ alternate._2
@@ -213,26 +225,21 @@ class SLIC (
     * @param c The center to which to find alternates for
     * @return A boolean and center coordinate pair, if false then center coordinates are -1
     */
-  private def findAlternateForCenter(c: (Int, Int, Int)): (Boolean, (Int, Int, Int)) = {
+  private def findAlternateForCenter(c: Center): (Boolean, Center) = {
 
     import scala.math.floor
 
-    val xC: Int = c._1
-    val yC: Int = c._2
-    val zC: Int = c._3
-
-    log.debug("Searching alternate for Center({},{},{})...", xC, yC, zC)
+    log.debug("Searching alternate for Center({},{},{})...", c.x, c.y, c.z)
 
     // Setup the starting and ending positions for x.y.z.
     // Find points around the center within starting superpixel size
-    val xStart: Int = if (xC - superPixelSize/2 < 0) 0 else floor(xC - superPixelSize/2).toInt
-    val yStart: Int = if (yC - superPixelSize/2 < 0) 0 else floor(yC - superPixelSize/2).toInt
-    val zStart: Int = if (zC - superPixelSize/2 < 0) 0 else floor(zC - superPixelSize/2).toInt
-    val xEnd: Int = if (xC + superPixelSize/2 > xDimSize) xDimSize else floor(xC + superPixelSize/2).toInt
-    val yEnd: Int = if (yC + superPixelSize/2 > yDimSize) yDimSize else floor(yC + superPixelSize/2).toInt
-    val zEnd: Int = if (zC + superPixelSize/2 > zDimSize) zDimSize else floor(zC + superPixelSize/2).toInt
+    val xStart: Int = if (c.x - superPixelSize/2 < 0) 0 else floor(c.x - superPixelSize/2).toInt
+    val yStart: Int = if (c.y - superPixelSize/2 < 0) 0 else floor(c.y - superPixelSize/2).toInt
+    val zStart: Int = if (c.z - superPixelSize/2 < 0) 0 else floor(c.z - superPixelSize/2).toInt
+    val xEnd: Int = if (c.x + superPixelSize/2 > xDimSize) xDimSize else floor(c.x + superPixelSize/2).toInt
+    val yEnd: Int = if (c.y + superPixelSize/2 > yDimSize) yDimSize else floor(c.y + superPixelSize/2).toInt
+    val zEnd: Int = if (c.z + superPixelSize/2 > zDimSize) zDimSize else floor(c.z + superPixelSize/2).toInt
 
-    val cAroundShape = Array(xEnd - xStart, yEnd - yStart, zEnd - zStart).map(i=>i.toLong)
     val arrayIndexIntervalsX = NDArrayIndex.interval(xStart, xEnd)
     val arrayIndexIntervalsY = NDArrayIndex.interval(yStart, yEnd)
     val arrayIndexIntervalsZ = NDArrayIndex.interval(zStart, zEnd)
@@ -250,25 +257,30 @@ class SLIC (
     if (numNaNs == voxelCoords.size(3)) {
 
       // Num NaNs equal num voxels. No potential candidates.
-      (false, (-1,-1,-1))
+      (false, null)
 
     } else {
 
       // Potential candidates available. Find one.
       var vi = 0
       var foundAlternate: Boolean = false
-      var alternate: (Int, Int, Int) = (-1,-1,-1)
+      // Case Class copy create a new instance of the case class but maintains its
+      // references to the original objects stored in the case class, x,y,z,n,IndArray
+      val alternate: Center = c.copy()
+
       val numVoxels = voxelCoords.vectorsAlongDimension(3)
       while(!foundAlternate && vi < numVoxels) {
         val vector = voxelCoords.vectorAlongDimension(vi, 3)
         if (!vector.getFloat(0).isNaN) { // Just check for the x value. The rest will be NaN too
           foundAlternate = true
-          alternate = (
-            vector.getFloat(0).toInt,
-            vector.getFloat(1).toInt,
-            vector.getFloat(2).toInt)
+
+          // Change the alternate's x.y.z
+          alternate.x = vector.getFloat(0).toInt
+          alternate.y = vector.getFloat(1).toInt
+          alternate.z = vector.getFloat(2).toInt
+
           log.debug("Found alternate Center ({},{},{})",
-            alternate._1, alternate._2, alternate._3)
+            alternate.x, alternate.y, alternate.z)
         }
 
         vi = vi + 1 // increment counter
@@ -288,8 +300,8 @@ class SLIC (
     * @return Modified list of Centers as [(int, int, int)]
     */
   private def adjustSuperCentersToLowContrast(
-                         centers: Array[(Int, Int, Int)],
-                         adjustBy: Int = 3): Array[(Int, Int, Int)] = {
+                         centers: Array[Center],
+                         adjustBy: Int = 3): Array[Center] = {
 
     import scala.math.floor
     import org.nd4j.linalg.ops.transforms.Transforms.pow
@@ -299,24 +311,21 @@ class SLIC (
     log.info("Perturbing Super Centers to Low Contrast...")
 
     // Loop through each current center
-    centers.map( c => {
-      // Existing current center
-      val xC: Int = c._1
-      val yC: Int = c._2
-      val zC: Int = c._3
+    for (ci <- centers.indices.par) {
+
+      val c = centers(ci)
 
       // Scores and best move for current center
       var maxScore: Float = 0f // Help to determine what the max score is for a particular center
-      var bestMove: (Int, Int, Int) = (xC, yC, zC) // The starting best move is no move at all
 
       // Calc starting and ending positions for x.y.z. around current center with adjustBy
       // This will define candidate new centers around this existing current center
-      val xStart: Int = if (c._1 - adjustBy < 0) 0 else floor(c._1 - adjustBy).toInt
-      val yStart: Int = if (c._2 - adjustBy < 0) 0 else floor(c._2 - adjustBy).toInt
-      val zStart: Int = if (c._3 - adjustBy < 0) 0 else floor(c._3 - adjustBy).toInt
-      val xEnd: Int = if (c._1 + adjustBy > xDimSize) xDimSize else floor(c._1 + adjustBy).toInt
-      val yEnd: Int = if (c._2 + adjustBy > yDimSize) yDimSize else floor(c._2 + adjustBy).toInt
-      val zEnd: Int = if (c._3 + adjustBy > zDimSize) zDimSize else floor(c._3 + adjustBy).toInt
+      val xStart: Int = if (c.x - adjustBy < 0) 0 else floor(c.x - adjustBy).toInt
+      val yStart: Int = if (c.y - adjustBy < 0) 0 else floor(c.y - adjustBy).toInt
+      val zStart: Int = if (c.z - adjustBy < 0) 0 else floor(c.z - adjustBy).toInt
+      val xEnd: Int = if (c.x + adjustBy > xDimSize) xDimSize else floor(c.x + adjustBy).toInt
+      val yEnd: Int = if (c.y + adjustBy > yDimSize) yDimSize else floor(c.y + adjustBy).toInt
+      val zEnd: Int = if (c.z + adjustBy > zDimSize) zDimSize else floor(c.z + adjustBy).toInt
 
       // Generate points for all potentially new centers around existing center
       val potentialNewCenters = for {
@@ -327,9 +336,9 @@ class SLIC (
         (x_s, y_s, z_s)
       }
 
-      // Loop through in parallel and calculate values for each new center
+      // Loop through and calculate values for each new center
       // Determine which center is best
-      potentialNewCenters.par.foreach(newCenter => {
+      potentialNewCenters.foreach(newCenter => {
 
         val newCenterVoxelCoords: INDArray = matrix.get(
           NDArrayIndex.point(newCenter._1),
@@ -397,20 +406,21 @@ class SLIC (
         BooleanIndexing.replaceWhere(calculatedDistances,0f, Conditions.isNan)
 
         val distSum = calculatedDistances.sumNumber().floatValue()
-        log.debug("Distance Sum during perturbing c[{},{},{}] = {}",
-          xC, yC, zC, distSum)
 
         // If difSum is less than current Max Score then we found a good new
-        // center to replace the current center. Save it and update Max Score
+        // center to replace the current center. Save new center values and update Max Score
         if (distSum > maxScore) {
-          bestMove = newCenter
+          c.x = newCenter._1
+          c.y = newCenter._2
+          c.z = newCenter._3
+
           maxScore = distSum
         }
       })
 
-      // Return the new center point, stored as best move
-      bestMove
-    })
+    }
+
+    centers
   }
 
   /**
@@ -423,7 +433,6 @@ class SLIC (
     import org.nd4j.linalg.ops.transforms.Transforms.sqrt
     import org.nd4j.linalg.factory.Broadcast
 
-
     log.info("Calculating Clusters...")
 
     var rounds: Int = 0
@@ -433,6 +442,9 @@ class SLIC (
     val cDeltaX = centerDelta._1
     val cDeltaY = centerDelta._2
     val cDeltaZ = centerDelta._3
+
+    // Parallel Range for center coordinate indices
+    val centerCoordsIndices: ParRange = centerCoords.indices.par
 
     while (anyChange && rounds < maxIteration) {
 
@@ -447,31 +459,31 @@ class SLIC (
       // Basically this goes through and assigns voxels to clusters
       // based on distance calculations according to SLIC
       val t0_clusterAssign = System.nanoTime()
-      for (ci <- centerCoords.indices.par) {
+      for (ci <- centerCoordsIndices) {
 
         // Get the current center
         val c = centerCoords(ci)
 
         // Setup the starting and ending positions for x.y.z.
         // Find points around the center outward of radius superpixelsize*2
-        val xStart: Int = if (c._1 - cDeltaX * superPixelSize < 0) 0 else floor(c._1 - cDeltaX * superPixelSize).toInt
-        val yStart: Int = if (c._2 - cDeltaY * superPixelSize < 0) 0 else floor(c._2 - cDeltaY * superPixelSize).toInt
-        val zStart: Int = if (c._3 - cDeltaZ * superPixelSize < 0) 0 else floor(c._3 - cDeltaZ * superPixelSize).toInt
-        val xEnd: Int = if (c._1 + cDeltaX * superPixelSize > xDimSize) xDimSize else floor(c._1 + cDeltaX * superPixelSize).toInt
-        val yEnd: Int = if (c._2 + cDeltaY * superPixelSize > yDimSize) yDimSize else floor(c._2 + cDeltaY * superPixelSize).toInt
-        val zEnd: Int = if (c._3 + cDeltaZ * superPixelSize > zDimSize) zDimSize else floor(c._3 + cDeltaZ * superPixelSize).toInt
+        val xStart: Int = if (c.x - cDeltaX * superPixelSize < 0) 0 else floor(c.x - cDeltaX * superPixelSize).toInt
+        val yStart: Int = if (c.y - cDeltaY * superPixelSize < 0) 0 else floor(c.y - cDeltaY * superPixelSize).toInt
+        val zStart: Int = if (c.z - cDeltaZ * superPixelSize < 0) 0 else floor(c.z - cDeltaZ * superPixelSize).toInt
+        val xEnd: Int = if (c.x + cDeltaX * superPixelSize > xDimSize) xDimSize else floor(c.x + cDeltaX * superPixelSize).toInt
+        val yEnd: Int = if (c.y + cDeltaY * superPixelSize > yDimSize) yDimSize else floor(c.y + cDeltaY * superPixelSize).toInt
+        val zEnd: Int = if (c.z + cDeltaZ * superPixelSize > zDimSize) zDimSize else floor(c.z + cDeltaZ * superPixelSize).toInt
 
         // Get center voxel information
         val centerVoxelCoords: INDArray = matrix.get(
-          NDArrayIndex.point(c._1),
-          NDArrayIndex.point(c._2),
-          NDArrayIndex.point(c._3),
+          NDArrayIndex.point(c.x),
+          NDArrayIndex.point(c.y),
+          NDArrayIndex.point(c.z),
           NDArrayIndex.interval(0,3) // Indices of coordinates stored in vector
         )
         val centerVoxelFeatures: INDArray = matrix.get(
-          NDArrayIndex.point(c._1),
-          NDArrayIndex.point(c._2),
-          NDArrayIndex.point(c._3),
+          NDArrayIndex.point(c.x),
+          NDArrayIndex.point(c.y),
+          NDArrayIndex.point(c.z),
           NDArrayIndex.interval(3,sDimSize) // Indices of actual data features in vector
         )
 

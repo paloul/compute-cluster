@@ -28,7 +28,7 @@ object SiaAgent extends ShardedMessages {
 
   // Execution Pool for Processing Data, these allow agents to perform long-running
   // tasks on a different thread pool separate from main message handler
-  private val procExecutorService = Executors.newFixedThreadPool(6 )
+  private val procExecutorService = Executors.newFixedThreadPool(4)
   private val procExecutionContext = ExecutionContext.fromExecutorService(procExecutorService)
 
   // Create the catch Message type for this agent
