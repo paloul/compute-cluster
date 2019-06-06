@@ -473,19 +473,21 @@ class SLIC (
         val yEnd: Int = if (c.y + cDeltaY * superPixelSize > yDimSize) yDimSize else floor(c.y + cDeltaY * superPixelSize).toInt
         val zEnd: Int = if (c.z + cDeltaZ * superPixelSize > zDimSize) zDimSize else floor(c.z + cDeltaZ * superPixelSize).toInt
 
-        // Get center voxel information
-        val centerVoxelCoords: INDArray = matrix.get(
-          NDArrayIndex.point(c.x),
-          NDArrayIndex.point(c.y),
-          NDArrayIndex.point(c.z),
-          NDArrayIndex.interval(0,3) // Indices of coordinates stored in vector
-        )
-        val centerVoxelFeatures: INDArray = matrix.get(
-          NDArrayIndex.point(c.x),
-          NDArrayIndex.point(c.y),
-          NDArrayIndex.point(c.z),
-          NDArrayIndex.interval(3,sDimSize) // Indices of actual data features in vector
-        )
+        // Create the center voxel coords from the center coords stored in current Center class object
+        val centerVoxelCoords: INDArray = Nd4j.create(Array(c.x,c.y,c.z), Array(3l), DataType.FLOAT)
+
+        // If no voxel has been added to this center average yet then assign starting
+        // features of current center from main matrix to it
+        if (c.nVoxels == 0) {
+          val centerVoxelFeatures: INDArray = matrix.get(
+            NDArrayIndex.point(c.x),
+            NDArrayIndex.point(c.y),
+            NDArrayIndex.point(c.z),
+            NDArrayIndex.interval(3,sDimSize) // Indices of actual data features in vector
+          )
+
+          c.voxelFeatureAvgs.addi(centerVoxelFeatures)
+        }
 
         val cAroundShape = Array(xEnd - xStart, yEnd - yStart, zEnd - zStart)
         val arrayIndexIntervalsX = NDArrayIndex.interval(xStart, xEnd)
@@ -517,7 +519,7 @@ class SLIC (
         // a scalar vector since we pull out 4th dimension using ArrayIndex.point.
         val resultForSubFeatures: INDArray = Nd4j.createUninitialized(voxelFeatures.shape())
         val subFeatures = Broadcast.sub(
-          voxelFeatures, centerVoxelFeatures, resultForSubFeatures, 3)
+          voxelFeatures, c.voxelFeatureAvgs, resultForSubFeatures, 3)
 
         // Calculate the distances of coordinates and features. This will give us a matrix
         // of shape (xEnd-xStart, yEnd-yStart, zEnd-zStart)
