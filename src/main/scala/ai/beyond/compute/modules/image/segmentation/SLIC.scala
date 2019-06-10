@@ -99,6 +99,7 @@ class SLIC (
 
         case e: Exception =>
           log.error(e.getMessage)
+          log.error(e.getStackTrace.mkString("\n"))
           // Cleanup the original clusters matrix that was given to us
           //clusters.close()
           // Return an empty nd4j INDArray to mark failure
@@ -139,6 +140,7 @@ class SLIC (
     } yield {
       //(x_s, y_s, z_s)
       // Create a new center with coordinates, initiate count to 0, initiate features vector to 0
+      // Feature vector size is -3 to take out the the x.y.z values stored in the fourth dim of source
       Center(x_s, y_s, z_s, 0, Nd4j.zeros(dims._4 - 3))
     }
 
@@ -146,10 +148,10 @@ class SLIC (
 
     // Optimize the centers and get them back as an array
     val optimumCentersGrid = adjustCentersAwayFromEmptyRegions(centersGrid)
+    optimumCentersGrid
 
-    val perturbedCentersGrid = adjustSuperCentersToLowContrast(optimumCentersGrid)
-
-    perturbedCentersGrid // Return optimum placed centers
+//    val perturbedCentersGrid = adjustSuperCentersToLowContrast(optimumCentersGrid)
+//    perturbedCentersGrid // Return optimum placed centers
   }
 
   /**
@@ -515,8 +517,8 @@ class SLIC (
 
         // broadcast subtraction of center point to range of all voxels
         // we want to get feature distance of. this is because shapes are not the same.
-        // Voxel Features is a 3D shape surrounding the center point. Center Features is
-        // a scalar vector since we pull out 4th dimension using ArrayIndex.point.
+        // Voxel Features is a 3D shape surrounding the center point. C.voxelFeaturesAvgs
+        // is a vector with three columns
         val resultForSubFeatures: INDArray = Nd4j.createUninitialized(voxelFeatures.shape())
         val subFeatures = Broadcast.sub(
           voxelFeatures, c.voxelFeatureAvgs, resultForSubFeatures, 3)
@@ -552,21 +554,26 @@ class SLIC (
         // The lengths of calculatedDistances, storedDistances, and clusterAssignment
         // are of the same length, as we get views into the larger underlying matrix
 
-        // Generate a mask of all voxel points where calculated distance is less that stored Distance.
+        // Generate a result of all voxel points where calculated distance is less that stored Distance.
         // lt = Less Than -> gives back a INDArray with BOOL types
-        // Take the NOT of the mask returned to flip bits stored in matrix mask
-        val isCloserMask = Transforms.not(calculatedDistances.lt(storedDistances)).castTo(DataType.INT)
+        val isCloser = calculatedDistances.lt(storedDistances)
 
         // Check if any voxel changed cluster assignment
-        val op: MatchCondition = new MatchCondition(isCloserMask, Conditions.greaterThan(0))
+        val op: MatchCondition = new MatchCondition(
+          isCloser.castTo(DataType.INT), Conditions.equals(1))
         val numVoxelsChanged = Nd4j.getExecutioner.exec(op).getInt(0)
-        log.debug("Num Voxels Changed Label: [{}]", numVoxelsChanged)
+
+        log.debug("[{}]Changed [{}]Total for Center[{}]", numVoxelsChanged, voxelCoords.length(), ci)
 
         // If we have any voxels that are changing labels then change them and update their stored distance
         if (numVoxelsChanged > 0) {
 
           // Yes there was change, mark it
           anyChange = true
+
+          // Take the NOT of the result to turn it into a mask,
+          // meaning 0 allows pass through where 1 does not
+          val isCloserMask = Transforms.not(isCloser)
 
           // Put calculated values that were less than stored with the boolean mask. PutWhereWithMask
           // generates a dupe so the underlying matrix is not modified. Which is why we must do Assign.
@@ -575,7 +582,6 @@ class SLIC (
 
           // Using the mask now set the new Cluster/Center Index for all
           // the points that were less than the stored Distance
-
           val replacedClusterAssignment = clusterAssignment.putWhereWithMask(
             isCloserMask,
             cAroundClusterLabels) // Create array here as API expects it.
@@ -587,6 +593,10 @@ class SLIC (
       log.info("Round [{}] cluster assignment time [{} (s)]",
         rounds,
         (t1_clusterAssign - t0_clusterAssign) / 1E9)
+
+
+      // TODO: At this point adjust the centers to reflect assignments i.e. averaging features and
+      //  moving center positions to reflect new center of mass of the cluster
     }
   }
 
