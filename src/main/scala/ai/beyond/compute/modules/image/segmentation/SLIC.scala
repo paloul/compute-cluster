@@ -14,10 +14,11 @@ class SLIC (
        matrix: INDArray,
        dimensions: (Int, Int, Int, Int),
        superPixelSize: Int = 15,
-       compactness: Float = .1f,
-       maxIteration: Int = 15,
-       minSuperSize: Int = 1,
-       centerDelta: (Float, Float, Float) = (2f, 2f, 2f)
+       compactness: Float = .01f,
+       maxIteration: Int = 10,
+       minChangePerRound: Double = 0.5,
+       minSuperSize: Int = Int.MinValue,
+       centerDelta: (Float, Float, Float) = (2.5f, 2.5f, 2.5f)
     ) (implicit logger: akka.event.LoggingAdapter) {
 
   // Simple Case class that defines a center. Holds more than just x.y.z values as we need
@@ -91,7 +92,7 @@ class SLIC (
         // Center Assignments are not directly forced to form a continuous superpixel.
         // The superpixels are made continuous by this function which reassigned
         // isolated "islands" to the best adjacent superpixel.
-        enforceConnectivity()
+        if (minSuperSize > 0) enforceConnectivity()
 
         clusters // Return the cluster labels matrix
 
@@ -148,10 +149,10 @@ class SLIC (
 
     // Optimize the centers and get them back as an array
     val optimumCentersGrid = adjustCentersAwayFromEmptyRegions(centersGrid)
-    optimumCentersGrid
+    //optimumCentersGrid
 
-//    val perturbedCentersGrid = adjustSuperCentersToLowContrast(optimumCentersGrid)
-//    perturbedCentersGrid // Return optimum placed centers
+    val perturbedCentersGrid = adjustSuperCentersToLowContrast(optimumCentersGrid)
+    perturbedCentersGrid // Return optimum placed centers
   }
 
   /**
@@ -438,7 +439,7 @@ class SLIC (
     log.info("Calculating Clusters...")
 
     var rounds: Int = 0
-    var anyChange: Boolean = true
+    var lastChange: Double = Double.MaxValue
 
     // How far out to get voxels surrounding a center in each direction
     val cDeltaX = centerDelta._1
@@ -448,13 +449,14 @@ class SLIC (
     // Parallel Range for center coordinate indices
     val centerCoordsIndices: ParRange = centerCoords.indices.par
 
-    while (anyChange && rounds < maxIteration) {
-
-      // reset the any change bit
-      anyChange = false
+    //while (anyChange && rounds < maxIteration) {
+    while (rounds < maxIteration & lastChange > minChangePerRound) {
 
       // Increment the round counter
       rounds += 1
+
+      log.info("Starting Round [{}]...", rounds)
+      val t0_round = System.nanoTime()
 
       // Use the indices of the centers to retrieve them,
       // since we use the center index as the cluster label index.
@@ -478,8 +480,8 @@ class SLIC (
         // Create the center voxel coords from the center coords stored in current Center class object
         val centerVoxelCoords: INDArray = Nd4j.create(Array(c.x,c.y,c.z), Array(3l), DataType.FLOAT)
 
-        // If no voxel has been added to this center average yet then assign starting
-        // features of current center from main matrix to it
+        // If no voxel has been added to this center yet then assign starting
+        // features of current center from main matrix to it. Means this was the first run
         if (c.nVoxels == 0) {
           val centerVoxelFeatures: INDArray = matrix.get(
             NDArrayIndex.point(c.x),
@@ -558,18 +560,14 @@ class SLIC (
         // lt = Less Than -> gives back a INDArray with BOOL types
         val isCloser = calculatedDistances.lt(storedDistances)
 
-        // Check if any voxel changed cluster assignment
-        val op: MatchCondition = new MatchCondition(
-          isCloser.castTo(DataType.INT), Conditions.equals(1))
-        val numVoxelsChanged = Nd4j.getExecutioner.exec(op).getInt(0)
+        // Check if any voxel changed cluster assignment, just cast bools to int,
+        // and then sum the whole array to get number of voxels that changed
+        val numVoxelsChanged = isCloser.castTo(DataType.INT).sumNumber().intValue()
 
         log.debug("[{}]Changed [{}]Total for Center[{}]", numVoxelsChanged, voxelCoords.length(), ci)
 
         // If we have any voxels that are changing labels then change them and update their stored distance
         if (numVoxelsChanged > 0) {
-
-          // Yes there was change, mark it
-          anyChange = true
 
           // Take the NOT of the result to turn it into a mask,
           // meaning 0 allows pass through where 1 does not
@@ -588,15 +586,117 @@ class SLIC (
           clusterAssignment.assign(replacedClusterAssignment) // Assign values from putwherewithmask
         }
       }
-
       val t1_clusterAssign = System.nanoTime()
-      log.info("Round [{}] cluster assignment time [{} (s)]",
+      log.info("Round [{}] cluster assignments [{} (s)]",
         rounds,
         (t1_clusterAssign - t0_clusterAssign) / 1E9)
 
+      // NOTE: At this point adjust the centers to reflect assignments i.e. averaging
+      //  features and moving center positions to reflect new center of mass of the cluster
 
-      // TODO: At this point adjust the centers to reflect assignments i.e. averaging features and
-      //  moving center positions to reflect new center of mass of the cluster
+      var totalCentersChange: Double = 0
+      val t0_calculateCenterAverages = System.nanoTime()
+      for (ci <- centerCoordsIndices) {
+
+        val center = centerCoords(ci)
+
+        // Find all matrix positions that are assigned to current center index: ci
+        val ciAssignments = clusters.eq(ci)
+
+        // Get total num of voxel assigned to this center. Since this is a bool matrix
+        // with 1's and 0's after being casted to Int, just add all values in matrix to
+        // get the total assigned
+        center.nVoxels = ciAssignments.castTo(DataType.INT).sumNumber().intValue()
+        log.debug("[{}] Voxels Assigned to Center[{}]", center.nVoxels, ci)
+
+        // Get three 3-dim matrices each representing x.y.z respectively
+        val matrixCoordsX = matrix.get(
+          NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.point(0)
+        )
+        val matrixCoordsY = matrix.get(
+          NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.point(1)
+        )
+        val matrixCoordsZ = matrix.get(
+          NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.point(2)
+        )
+
+        // Float casted ci assignments for multiplication
+        val ciAssignmentsFloat = ciAssignments.castTo(DataType.FLOAT)
+
+        // Create a temp coords matrix in the shape of the above three. This
+        // is to avoid having to create a large matrix over and over.
+        // Assign values from each respective matrix then do multiple inplace
+        val tempMatrix = Nd4j.create(xDimSize, yDimSize, zDimSize, 1)
+
+        // Multiply each coordinate axis values with the ciAssignments bool matrix
+        // casted to an Int to get a new matrix with zero'd values where assignments is false
+        // Replace NaNs in the matrices with 0's on the temp matrix
+        tempMatrix.assign(matrixCoordsX) // Assign matrix coords x to temp matrix
+        val xAvgTemp = tempMatrix.muli(ciAssignmentsFloat)
+        BooleanIndexing.replaceWhere(xAvgTemp, 0.0, Conditions.isNan)
+        val xAverage = floor(
+          xAvgTemp.sumNumber().floatValue() / center.nVoxels).toInt
+
+        tempMatrix.assign(matrixCoordsY) // Assign matrix coords y to temp matrix
+        val yAvgTemp = tempMatrix.muli(ciAssignmentsFloat)
+        BooleanIndexing.replaceWhere(yAvgTemp, 0.0, Conditions.isNan)
+        val yAverage = floor(
+          yAvgTemp.sumNumber().floatValue() / center.nVoxels).toInt
+
+        tempMatrix.assign(matrixCoordsZ) // Assign matrix coords z to temp matrix
+        val zAvgTemp = tempMatrix.muli(ciAssignmentsFloat)
+        BooleanIndexing.replaceWhere(zAvgTemp, 0.0, Conditions.isNan)
+        val zAverage = floor(
+          zAvgTemp.sumNumber().floatValue() / center.nVoxels).toInt
+
+        log.debug("Round[{}] Center[{}] Positions old=["+
+          center.x+","+center.y+","+center.z+
+          "] new=["+
+          xAverage+","+yAverage+","+zAverage+"]", rounds, ci)
+
+        // Record the change from previous center, the change
+        // is the distance between old and new positions
+        totalCentersChange += Math.sqrt(
+          Math.pow(center.x - xAverage, 2) +
+          Math.pow(center.y - yAverage, 2) +
+          Math.pow(center.z - zAverage, 2))
+
+        // Assign positional x.y.z averages as the new point for the center
+        center.x = xAverage
+        center.y = yAverage
+        center.z = zAverage
+
+        // Loop through all the actual features stored in the matrix and get averages for them
+        for (i <- 3 until sDimSize) {
+
+          // Get the feature matrix for current i of all points
+          val matrixIthFeature = matrix.get(
+            NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.point(i)
+          )
+
+          // Multiply each coordinate axis values with the ciAssignments bool matrix
+          // casted to an Int to get a new matrix with zero'd values where assignments is false
+          // Replace NaNs in the matrices with 0's on the temp matrix
+          tempMatrix.assign(matrixIthFeature)
+          val matrixIthFeatureTemp = tempMatrix.muli(ciAssignmentsFloat)
+          BooleanIndexing.replaceWhere(matrixIthFeatureTemp, 0.0, Conditions.isNan)
+          val ithFeatureAvg = matrixIthFeatureTemp.sumNumber().floatValue() / center.nVoxels
+
+          // Set it to the voxel features average vector for the center
+          center.voxelFeatureAvgs.putScalar(i - 3, ithFeatureAvg)
+        }
+      }
+      lastChange = totalCentersChange / centerCoords.length
+      val t1_calculateCenterAverages = System.nanoTime()
+      log.info("Round [{}] center adjustments [{} (s)]",
+        rounds,
+        (t1_calculateCenterAverages - t0_calculateCenterAverages) / 1E9)
+      log.info("Average Center Distance Change [{}]", lastChange)
+
+      val t1_round = System.nanoTime()
+      log.info("Round [{}] completed [{} (s)]",
+        rounds,
+        (t1_round - t0_round) / 1E9)
     }
   }
 
