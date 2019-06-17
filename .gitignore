@@ -74,6 +74,7 @@ project/plugins/project/
 .idea/modules.xml
 .idea/*.iml
 .idea/modules
+.idea/modules/
 
 # CMake
 cmake-build-*/
