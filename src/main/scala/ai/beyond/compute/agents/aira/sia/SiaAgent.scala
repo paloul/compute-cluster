@@ -325,7 +325,7 @@ class SiaAgent extends AiraAgent  {
     voiResIterator.foreach(
       {
         // Right side of read result is our actual value, IF everything went well reading it
-        case Right(voiRes) => {
+        case Right(voiRes) =>
           // Storing as [NX,NY,NZ,PERM-X,PERM-Z,POROSITY] in the fourth dimension
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 0), voiRes.nx)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 1), voiRes.ny)
@@ -333,12 +333,12 @@ class SiaAgent extends AiraAgent  {
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 3), voiRes.permX)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 4), voiRes.permZ)
           reservoirMatrix.putScalar(Array(voiRes.nx, voiRes.ny, voiRes.nz, 5), voiRes.porosity)
-        }
+
         // Left side of read result is the error, IF something went bad
-        case Left(error) => {
+        case Left(error) =>
           log.error("Error parsing a line from [{}]", META_PROPS.voiResFileName)
           log.error(error.getMessage)
-        }
+
       }
     )
 
