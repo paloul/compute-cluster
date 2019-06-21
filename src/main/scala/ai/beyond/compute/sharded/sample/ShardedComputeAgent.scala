@@ -20,12 +20,12 @@ object ShardedComputeAgent extends ShardedMessages {
 class ShardedComputeAgent extends ComputeAgent {
 
   // Capture when an instance was created, val because it shouldn't change
-  val objCreationTime = System.nanoTime()
+  private val objCreationTime = System.nanoTime()
 
   // Default handler for any UNHANDLED messages received not captured by
   // the base class. Any messages received by an Agent that
   // are unhandled by its current RECEIVE definition are caught here
-  override def unhandled(msg: Any) = msg match {
+  override def unhandled(msg: Any): Unit = msg match {
     // Received a ReceiveTimeout message from the context. This message is initiated
     // by the call above to context.setReceiveTimeout after x seconds have passed
     case ReceiveTimeout =>

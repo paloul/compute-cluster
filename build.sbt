@@ -1,12 +1,12 @@
-name := "ai.beyond.compute-cluster"
+name := "com.paloul.compute-cluster"
 
-organization := "ai.beyond"
+organization := "com.paloul"
 
-maintainer := "gpaloulian@beyond.ai"
+maintainer := "george.k.paloulian@gmail.com"
 
 version := "0.0.1"
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.13.0"
 
 exportJars := true
 
@@ -21,11 +21,9 @@ scalacOptions ++= Seq(
 )
 
 libraryDependencies ++= {
-  val json4sVersion = "3.6.4"
-  val akkaVersion = "2.5.20"
-  val akkaHttpVersion = "10.1.7"
-  val akkaPersistenceCassandra = "0.93"
-  val nd4jVersion = "1.0.0-beta4"
+  val akkaVersion = "2.5.23"
+  val akkaHttpVersion = "10.1.8"
+  val akkaPersistenceCassandra = "0.98"
 
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
@@ -50,25 +48,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
 
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-    "ch.qos.logback" % "logback-classic" % "1.2.3",
-
-    // Used for serialization of messages between agents
-    "org.json4s" %% "json4s-native" % json4sVersion,
-
-    // Kafka client
-    "org.apache.kafka" % "kafka-clients" % "2.1.1",
-
-    // Mongo client
-    "org.mongodb.scala" %% "mongo-scala-driver" % "2.6.0",
-
-    // kantan.csv - https://nrinaudo.github.io/kantan.csv/
-    "com.nrinaudo" %% "kantan.csv" % "0.5.0",
-    "com.nrinaudo" %% "kantan.csv-java8" % "0.5.0",
-    "com.nrinaudo" %% "kantan.csv-generic" % "0.5.0",
-
-    // https://deeplearning4j.org/docs/latest/deeplearning4j-config-buildtools
-    "org.deeplearning4j" % "deeplearning4j-core" % nd4jVersion,
-    "org.nd4j" % "nd4j-native-platform" % nd4jVersion
+    "ch.qos.logback" % "logback-classic" % "1.2.3"
   )
 }
 

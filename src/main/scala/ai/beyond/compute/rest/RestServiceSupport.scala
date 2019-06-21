@@ -1,8 +1,6 @@
 package ai.beyond.compute.rest
 
 import ai.beyond.compute.Settings
-import ai.beyond.compute.rest.aira.geo.GeoDynamicAgentRestServices
-import ai.beyond.compute.rest.aira.sia.SiaAgentRestServices
 import ai.beyond.compute.rest.sample.ComputeAgentRestServices
 import akka.util.Timeout
 
@@ -13,7 +11,7 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Directives._ // provides the ~ for appending routes
 import akka.event.Logging
 
 // This trait is merely support to setup the Rest Services
@@ -41,13 +39,11 @@ trait RestServiceSupport extends RequestTimeout {
     // Create each Rest Service class and get its routes
     // Each RestService class defines the routes and how to deal with each request, i.e. forward to agents
     val computeRestApiRoutes = new ComputeAgentRestServices(agents, system).routes
-    val siaRestApiRoutes = new SiaAgentRestServices(agents, system).routes
-    val geoDynamicRestApiRoutes = new GeoDynamicAgentRestServices(agents, system).routes
-    /* INSTANTIATE ADDITIONAL REST API ROUTES HERE AFTER CREATION OF NEW SUPPORT CLASS */
+    /* NOTE: INSTANTIATE ADDITIONAL REST API ROUTES HERE AFTER CREATION OF NEW SUPPORT CLASS */
 
     // Combine all the routes from underlying agent rest services in to one
-    val routes = computeRestApiRoutes ~ siaRestApiRoutes ~ geoDynamicRestApiRoutes
-    /* APPEND ANY NEW ROUTES HERE WITH THE ~ SYMBOL */
+    val routes = computeRestApiRoutes
+    /* NOTE: APPEND ANY NEW ROUTES HERE WITH THE ~ SYMBOL */
 
     val host = settings.http.host // Host address to bind to
     val port = settings.http.port // Port address to bind to
@@ -69,19 +65,6 @@ trait RestServiceSupport extends RequestTimeout {
         CoordinatedShutdown(system).run(new FailedToBind with CoordinatedShutdown.Reason)
       }
     }
-
-    // GKP: Disabled the following exit handler as caused issues with running inside Docker
-//    // Capture the Enter key here to initiate the shutdown process properly
-//    log.info("Press the 'enter' key to initiate shutdown...")
-//    scala.io.StdIn.readLine() // ReadLine will wait until a new line is submitted
-//    // Unbind from the port and shut down when down
-//    bindingFuture
-//      .flatMap(_.unbind())
-//      .onComplete(_ => {
-//          CoordinatedShutdown(system).run(new ShutdownRequested with CoordinatedShutdown.Reason)
-//        }
-//      )
-
   }
 }
 

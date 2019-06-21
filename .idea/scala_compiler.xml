@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ScalaCompilerConfiguration">
-    <profile name="sbt 1" modules="ai-beyond-fpt-mvp-compute-agents_8112" />
-    <profile name="sbt 2" modules="ai.beyond.compute-cluster,ai.beyond.fpt.mvp.compute-agents">
+    <profile name="sbt 1" modules="com-paloul-compute-cluster_8043" />
+    <profile name="sbt 2" modules="ai.beyond.compute-cluster,com.paloul.compute-cluster">
       <option name="postfixOps" value="true" />
       <option name="deprecationWarnings" value="true" />
       <option name="uncheckedWarnings" value="true" />

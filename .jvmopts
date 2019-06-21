@@ -2,5 +2,3 @@
 -Xmx4G
 -Xss2M
 -XX:MaxMetaspaceSize=2G
--Dorg.bytedeco.javacpp.maxbytes=16G
--Dorg.bytedeco.javacpp.maxphysicalbytes=20G
