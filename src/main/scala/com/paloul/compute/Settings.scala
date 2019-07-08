@@ -1,4 +1,4 @@
-package ai.beyond.compute
+package com.paloul.compute
 
 import java.util.Properties
 
@@ -34,7 +34,7 @@ object Settings extends ExtensionId[Settings] with ExtensionIdProvider {
   * Settings class to help parse applciation.conf and make values available
   * during runtime of application. If you want something from app.conf
   * available in application then add objects and parsing logic here
-  * @param config
+  * @param config The reference to config parameters i.e. the application.conf
   */
 class Settings(config: Config) extends Extension {
 
@@ -43,6 +43,7 @@ class Settings(config: Config) extends Extension {
   // Holds config params from application.conf concerning the Cluster App settings
   object cluster {
     val name: String = config.getString("application.cluster.name")
+    var agentTimeout: Duration = Duration(config.getString("application.cluster.agent-timeout"))
   }
 
   // Holds config params from application.conf concerning the HTTP API settings

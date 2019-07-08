@@ -1,17 +1,17 @@
-package ai.beyond.compute.sharded
+package com.paloul.compute.sharded
 
-import ai.beyond.compute.Settings
-import ai.beyond.compute.agents.sample.ComputeAgent
-import ai.beyond.compute.sharded.sample.ShardedComputeAgent
+import com.paloul.compute.Settings
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
+import com.paloul.compute.sharded.sample.ShardedComputeAgent
+import com.paloul.compute.agents.sample.computeagentprotocol
 
 object ShardedAgents {
-  var mySettings: Option[Settings] = None
+  var settings: Option[Settings] = None
 
-  def props(settings: Settings): Props = {
+  def props(s: Settings): Props = {
 
-    mySettings = Some(settings)
+    settings = Some(s)
 
     Props(new ShardedAgents)
   }
@@ -21,10 +21,13 @@ object ShardedAgents {
 
 class ShardedAgents extends Actor with ActorLogging {
 
+  // Import items from companion object
+  import ShardedAgents._
+
   // Start the cluster shard system and manager for the Compute agents
   val shardedComputeAgents: ActorRef = ClusterSharding(context.system).start(
     ShardedComputeAgent.shardName,
-    ShardedComputeAgent.props,
+    ShardedComputeAgent.props(settings.get),
     ClusterShardingSettings(context.system),
     ShardedComputeAgent.extractEntityId,
     ShardedComputeAgent.extractShardId
@@ -36,8 +39,8 @@ class ShardedAgents extends Actor with ActorLogging {
     // from within their companion object. This way this receive function stays fairly
     // concise, matching the number of sharded agent types in the cluster
 
-    case computeMessage: ComputeAgent.Message =>
-      shardedComputeAgents forward computeMessage
+    case computeAgentEnvelope: computeagentprotocol.ShardedEnvelope =>
+      shardedComputeAgents forward computeAgentEnvelope
   }
 
 }

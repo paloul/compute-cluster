@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+import "scalapb/scalapb.proto";
+import "google/protobuf/timestamp.proto";
+
+package com.paloul.compute.agents.sample.computeagentprotocol;
+
+option (scalapb.options) = {
+    single_file: true
+    flat_package: true
+    preamble: "sealed trait Command"
+    preamble: "sealed trait Event"
+};
+
+// This Sharded Wrapper is treated as the base message. It contains
+//  the actor_id which is used by extractEntityId and extractShardId.
+//  Messages that will be used across the cluster should be wrapped with this.
+message ShardedEnvelope {
+    string actor_id = 1;
+    oneof contents {
+        InitiateStop initiateStop = 2;
+        PrintPath printPath = 3;
+        RepeatMe repeatMe = 4;
+    }
+}
+
+// Commands //
+message Stop {
+    option (scalapb.message).extends = "Command";
+}
+
+message InitiateStop {
+    option (scalapb.message).extends = "Command";
+}
+
+message PrintPath {
+    option (scalapb.message).extends = "Command";
+}
+
+message RepeatMe {
+    option (scalapb.message).extends = "Command";
+    string message_to_repeat = 2;
+}

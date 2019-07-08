@@ -1,7 +1,5 @@
-package ai.beyond.compute.rest
+package com.paloul.compute.rest
 
-import ai.beyond.compute.Settings
-import ai.beyond.compute.rest.sample.ComputeAgentRestServices
 import akka.util.Timeout
 
 import scala.util.{Failure, Success}
@@ -11,8 +9,10 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Directives._ // provides the ~ for appending routes
+//import akka.http.scaladsl.server.Directives._
 import akka.event.Logging
+import com.paloul.compute.Settings
+import com.paloul.compute.rest.sample.ComputeAgentRestServices
 
 // This trait is merely support to setup the Rest Services
 // Instantiates and uses the RestService class underneath

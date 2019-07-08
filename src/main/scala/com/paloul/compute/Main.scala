@@ -1,8 +1,8 @@
-package ai.beyond.compute
+package com.paloul.compute
 
-import ai.beyond.compute.rest.RestServiceSupport
-import ai.beyond.compute.sharded.ShardedAgents
 import akka.actor.ActorSystem
+import com.paloul.compute.rest.RestServiceSupport
+import com.paloul.compute.sharded.ShardedAgents
 import com.typesafe.config.ConfigFactory
 
 object Main extends App with RestServiceSupport {
