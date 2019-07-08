@@ -20,7 +20,7 @@ class ComputeAgentRestServices(shardedAgents: ActorRef, system: ActorSystem)(imp
   // All route subroutines below should be added to this definition.
   // This routes definition is publicly available to the outside
   def routes: server.Route =
-    computeAgentPrintPath ~ computeAgentRepeat
+    computeAgentPrintPath ~ computeAgentRepeat ~ computeAgentDoWork
 
   //------------------------------------------------------------------------//
   // Begin API Routes
@@ -49,6 +49,18 @@ class ComputeAgentRestServices(shardedAgents: ActorRef, system: ActorSystem)(imp
           // We need to wrap messages sent to our cluster shard with ShardedEnvelope as the
           // system needs to know how to direct messages to each final destination/actor
           shardedAgents ! ShardedEnvelope(id).withRepeatMe(RepeatMe("Hello, there!"))
+          complete(OK)
+        }
+      }
+    }
+  }
+
+  // API handler for /v1/api/compute/{id}/do_work
+  private def computeAgentDoWork = {
+    get {
+      pathPrefix("api" / "v1" / "compute" / UniqueIdString / "do_work") { id =>
+        pathEndOrSingleSlash {
+          shardedAgents ! ShardedEnvelope(id).withDoWork(DoWork())
           complete(OK)
         }
       }

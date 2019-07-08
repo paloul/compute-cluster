@@ -22,9 +22,11 @@ object ShardedComputeAgent {
     case env: ShardedEnvelope =>
       env.contents match {
 
+        // Any Message intended to be routed over sharded cluster should be added here
         case ShardedEnvelope.Contents.InitiateStop(initiateStop) => (env.actorId, initiateStop)
         case ShardedEnvelope.Contents.PrintPath(printPath) => (env.actorId, printPath)
         case ShardedEnvelope.Contents.RepeatMe(repeatMe) => (env.actorId, repeatMe)
+        case ShardedEnvelope.Contents.DoWork(doWork) => (env.actorId, doWork)
 
       }
   }

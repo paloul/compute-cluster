@@ -21,6 +21,7 @@ message ShardedEnvelope {
         InitiateStop initiateStop = 2;
         PrintPath printPath = 3;
         RepeatMe repeatMe = 4;
+        DoWork doWork = 5;
     }
 }
 
@@ -40,4 +41,8 @@ message PrintPath {
 message RepeatMe {
     option (scalapb.message).extends = "Command";
     string message_to_repeat = 2;
+}
+
+message DoWork {
+    option (scalapb.message).extends = "Command";
 }
