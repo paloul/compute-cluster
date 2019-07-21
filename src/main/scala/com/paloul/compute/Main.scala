@@ -1,6 +1,7 @@
 package com.paloul.compute
 
 import akka.actor.ActorSystem
+import com.paloul.compute.agents.util.MetricsListener
 import com.paloul.compute.rest.RestServiceSupport
 import com.paloul.compute.sharded.ShardedAgents
 import com.typesafe.config.ConfigFactory
@@ -19,6 +20,7 @@ object Main extends App with RestServiceSupport {
   // Note: Here you can start any number of Actor types, especially utility based Actors
   //  that might need to be available on each main cluster node and not act part of cluster
   //system.actorOf(UtilAgent.props(settings), UtilAgent.name)
+  system.actorOf(MetricsListener.props(settings), MetricsListener.name)
 
   // Get the main actor type to be used for sharded cluster of actors
   // ShardedAgents deals with identifying incoming requests and routing them

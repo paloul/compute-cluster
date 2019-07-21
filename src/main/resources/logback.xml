@@ -65,7 +65,7 @@
     <logger name="io.netty" level="WARN" />
 
     <root name="root" level="DEBUG" additivity="TRUE">
-        <appender-ref ref="ROLLING_FILE" />
+        <!--<appender-ref ref="ROLLING_FILE" />-->
         <appender-ref ref="STDOUT" />
     </root>
     <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
