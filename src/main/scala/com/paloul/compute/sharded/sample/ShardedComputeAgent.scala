@@ -74,7 +74,7 @@ class ShardedComputeAgent(settings: Settings) extends ComputeAgent(settings) {
 
     // Catch the unhandled message, as Scala Match throws an error scala.MatchError if we don't catch them
     case _ =>
-      log.warning("Received unknown message that was unhandled, ignoring")
+      log.warn("Received unknown message that was unhandled, ignoring")
       context.sender ! "Moron, I don't know how to process your message"
   }
 

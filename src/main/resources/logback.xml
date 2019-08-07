@@ -32,6 +32,11 @@
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
     </appender>
+
+    <appender name="ASYNC_APPENDER" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT"/>
+<!--        <appender-ref ref="ROLLING_FILE"/>-->
+    </appender>
     <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
 
 
@@ -66,7 +71,8 @@
 
     <root name="root" level="DEBUG" additivity="TRUE">
         <!--<appender-ref ref="ROLLING_FILE" />-->
-        <appender-ref ref="STDOUT" />
+        <!--<appender-ref ref="STDOUT" />-->
+        <appender-ref ref="ASYNC_APPENDER" />
     </root>
     <!--////////////////////////////////////////////////////////////////////////////////////////////////////////////-->
 

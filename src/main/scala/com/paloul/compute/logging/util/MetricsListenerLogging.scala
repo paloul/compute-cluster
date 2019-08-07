@@ -1,15 +1,12 @@
-package com.paloul.compute.logging.sample
+package com.paloul.compute.logging.util
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import com.paloul.compute.agents.sample.ComputeAgent
+import com.paloul.compute.agents.util.MetricsListener
 
-// Extend the ActorLogging Trait with ComputeAgentLogging trait
-// to add additional loggers for Job Status and Job Results
-// Restricted only to the ComputeAgent class
-trait ComputeAgentLogging { this: ComputeAgent =>
+trait MetricsListenerLogging { this: MetricsListener =>
 
-  private val _logger = LoggerFactory.getLogger(ComputeAgent.getClass)
+  private val _logger = LoggerFactory.getLogger(MetricsListener.getClass)
 
   /*
     NOTE: You can add any custom log adapter here. This would be

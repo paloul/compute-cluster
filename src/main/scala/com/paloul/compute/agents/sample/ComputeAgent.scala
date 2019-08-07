@@ -52,7 +52,7 @@ class ComputeAgent(settings: Settings) extends Actor with
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     // Debugging information if agent is restarted
-    log.error(reason, "Compute Agent restarting due to [{}] when processing [{}]",
+    log.error("Compute Agent restarting due to [{}] when processing [{}]",
       reason.getMessage, message.getOrElse(""))
     super.preRestart(reason, message)
   }

@@ -1,10 +1,11 @@
 package com.paloul.compute.sharded
 
 import com.paloul.compute.Settings
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import com.paloul.compute.sharded.sample.ShardedComputeAgent
 import com.paloul.compute.agents.sample.computeagentprotocol
+import com.paloul.compute.logging.sharded.ShardedAgentsLogging
 
 object ShardedAgents {
   var settings: Option[Settings] = None
@@ -19,7 +20,7 @@ object ShardedAgents {
   def name: String = "compute-cluster-sharded-agents"
 }
 
-class ShardedAgents extends Actor with ActorLogging {
+class ShardedAgents extends Actor with ShardedAgentsLogging {
 
   // Import items from companion object
   import ShardedAgents._

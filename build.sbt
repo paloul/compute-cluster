@@ -32,7 +32,6 @@ libraryDependencies ++= {
 
     "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
     "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
-
     // https://github.com/akka/akka-persistence-cassandra
     "com.typesafe.akka" %% "akka-persistence-cassandra" % akkaPersistenceCassandra,
 
